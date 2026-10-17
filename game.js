@@ -2,7 +2,7 @@
 
 (() => {
   const canvas = document.getElementById('game');
-  const ctx = canvas.getContext('2d');
+  let ctx = canvas.getContext('2d');
   const W = 960;
   const H = 540;
   const DPR = Math.min(2, window.devicePixelRatio || 1);
@@ -139,14 +139,32 @@
       x += 140 + rnd() * 110;
     }
 
-    // Cheerleaders turn up now and then along the footpaths.
-    const cheer = [];
-    for (let cx = 120 + rnd() * 80; cx < TRACK_LEN - 60; cx += 160 + rnd() * 180) {
-      cheer.push({ x: cx, side: rnd() < 0.5 ? 0 : 1, look: pick(CHEER_LOOKS, rnd), t: rnd() * 10, said: false });
-    }
-    // ...and a squad at the finish.
-    cheer.push({ x: TRACK_LEN + 6, side: 1, look: CHEER_LOOKS[0], t: 0, said: false });
-    cheer.push({ x: TRACK_LEN + 10, side: 1, look: CHEER_LOOKS[1], t: 1, said: false });
+    // Cheerleaders turn up now and then along the footpaths, each with three
+    // spectators around them, plus TV news crews at the start and finish.
+    const people = [];
+    const vans = [];
+    const addCheer = (x, side, look) => {
+      people.push({ kind: 'cheer', x, side, look, t: rnd() * 10, said: false });
+      for (const off of [-6.5, -3.2, 3.6]) {
+        people.push({ kind: 'fan', x: x + off + (rnd() - 0.5), side, look: randomSpectator(rnd), t: rnd() * 10, scale: 0.92 + rnd() * 0.14 });
+      }
+    };
+    for (let cx = 120 + rnd() * 80; cx < TRACK_LEN - 60; cx += 160 + rnd() * 180) addCheer(cx, rnd() < 0.5 ? 0 : 1, pick(CHEER_LOOKS, rnd));
+    addCheer(TRACK_LEN + 6, 1, CHEER_LOOKS[0]);
+    addCheer(TRACK_LEN + 14, 1, CHEER_LOOKS[1]);
+    const addCrew = (x, side, cameraFacesLeft, line, look) => {
+      const camX = cameraFacesLeft ? x + 5 : x;
+      const repX = cameraFacesLeft ? x : x + 5;
+      people.push({ kind: 'camera', x: camX, side, look: CAMERA_LOOK, t: rnd() * 10, flip: cameraFacesLeft });
+      people.push({ kind: 'reporter', x: repX, side, look, t: rnd() * 10, flip: !cameraFacesLeft, line, said: false });
+    };
+    addCrew(-27, 1, false, 'Live from Flinders St!', REPORTER_LOOKS[0]);
+    vans.push({ x: 33, side: 0 });
+    addCrew(41, 0, true, 'And they\'re off!', REPORTER_LOOKS[1]);
+    addCrew(TRACK_LEN + 24, 1, true, 'What a finish!', REPORTER_LOOKS[1]);
+    vans.push({ x: TRACK_LEN + 4, side: 0 });
+    addCrew(TRACK_LEN + 12, 0, true, 'Unbelievable scenes!', REPORTER_LOOKS[0]);
+    people.sort((a, b) => (a.kind === 'fan' ? 0 : 1) - (b.kind === 'fan' ? 0 : 1));
 
     // Far skyline (parallax 0.12): towers, with Melbourne landmarks mixed in.
     const far = [];
@@ -174,7 +192,7 @@
     const stops = [];
     for (let sx = 260; sx < TRACK_LEN - 100; sx += 330 + rnd() * 120) stops.push({ x: sx, n: 10 + Math.floor(rnd() * 120) });
 
-    return { slowZones, crossings, cheer, far, mid, trees, stops };
+    return { slowZones, crossings, people, vans, far, mid, trees, stops };
   }
 
   // Where the car at a crossing is (y of its wheels, in pixels) at a time, or null.
@@ -195,35 +213,67 @@
   }
 
   // ---- Characters ---------------------------------------------------------
-  const PLAYER_LOOK = { skin: '#ffe0c7', hair: '#2d6cdf', hairDark: '#1d4aa0', style: 'spiky', eye: '#1d4aa0', outfit: '#23395b', trim: '#f4c430', cap: '#1b2a44', legs: '#1b2a44' };
-  const CPU_LOOK = { skin: '#f7d2b6', hair: '#e2e6ee', hairDark: '#a9b0bf', style: 'pony', eye: '#2e9e5b', outfit: '#3f4a52', trim: '#78be20', cap: null, legs: '#2b3036' };
+  const PLAYER_LOOK = { skin: '#ffe0c7', hair: '#2d6cdf', hairDark: '#1d4aa0', style: 'spiky', eye: '#1d4aa0', outfit: '#23395b', trim: '#f4c430', cap: '#1b2a44', legs: '#1b2a44', shoes: '#111' };
+  const CPU_LOOK = { skin: '#f7d2b6', hair: '#e2e6ee', hairDark: '#a9b0bf', style: 'pony', eye: '#2e9e5b', outfit: '#3f4a52', trim: '#78be20', cap: null, legs: '#2b3036', shoes: '#111' };
   const CHEER_LOOKS = [
-    { skin: '#ffe3cf', hair: '#ff6fa8', hairDark: '#d94a86', style: 'twin', eye: '#b0306a', outfit: '#ffffff', trim: '#1f4fa3', skirt: '#1f4fa3', legs: '#ffe3cf', pom: '#f4c430' },
-    { skin: '#f3c9a5', hair: '#f6c544', hairDark: '#c99a22', style: 'twin', eye: '#6b3fa0', outfit: '#ffffff', trim: '#c0392b', skirt: '#c0392b', legs: '#f3c9a5', pom: '#ffffff' },
-    { skin: '#d9a07a', hair: '#3a2a2a', hairDark: '#1e1414', style: 'pony', eye: '#5a3a1a', outfit: '#ffffff', trim: '#16a085', skirt: '#16a085', legs: '#d9a07a', pom: '#f39c12' },
+    { skin: '#ffe3cf', hair: '#ff6fa8', hairDark: '#d94a86', style: 'twin', eye: '#b0306a', outfit: '#ffffff', trim: '#1f4fa3', skirt: '#1f4fa3', legs: '#ffe3cf', pom: '#f4c430', shoes: '#fff' },
+    { skin: '#f3c9a5', hair: '#f6c544', hairDark: '#c99a22', style: 'twin', eye: '#6b3fa0', outfit: '#ffffff', trim: '#c0392b', skirt: '#c0392b', legs: '#f3c9a5', pom: '#ffffff', shoes: '#fff' },
+    { skin: '#d9a07a', hair: '#3a2a2a', hairDark: '#1e1414', style: 'pony', eye: '#5a3a1a', outfit: '#ffffff', trim: '#16a085', skirt: '#16a085', legs: '#d9a07a', pom: '#f39c12', shoes: '#fff' },
   ];
+  const REPORTER_LOOKS = [
+    { skin: '#ffe0c7', hair: '#6b3a1f', hairDark: '#4a2612', style: 'bob', eye: '#6b3a1f', outfit: '#b5223a', trim: '#f3e6e6', legs: '#2a2a33', shoes: '#111' },
+    { skin: '#e8b996', hair: '#1c1c24', hairDark: '#0d0d12', style: 'short', eye: '#3a3a5a', outfit: '#2f3e5c', trim: '#dfe6ee', legs: '#2a2a33', shoes: '#111' },
+  ];
+  const CAMERA_LOOK = { skin: '#f0c8a8', hair: '#5a4a3a', hairDark: '#3a2e24', style: 'short', eye: '#3a2e24', outfit: '#4b5a3c', trim: '#2b3324', legs: '#3a3f46', shoes: '#222', cap: '#22262b' };
+  const SKINS = ['#ffe3cf', '#f7d2b6', '#f0c8a8', '#e3b08c', '#c98d66', '#9a6646', '#ffd9c2'];
+  const HAIRS = [['#2d2a32', '#17151a'], ['#7a4a2a', '#563218'], ['#e8c34a', '#b8942a'], ['#c0392b', '#8e2a20'], ['#7d5fd3', '#5a41a8'], ['#e2e6ee', '#a9b0bf'], ['#3fae8f', '#2b7c66'], ['#f08bb4', '#c86190']];
+  const STYLES = ['short', 'spiky', 'bob', 'long', 'pony', 'bun'];
+  const OUTFITS = ['#e8590c', '#1971c2', '#2f9e44', '#f8f9fa', '#ae3ec9', '#f59f00', '#c92a2a', '#495057', '#0ca678'];
+  const PROPS = ['flag', 'scarf', 'phone', 'sign', 'none', 'flag', 'scarf'];
+  const OUTLINE = '#2b1d1d';
 
+  function randomSpectator(rnd) {
+    const [hair, hairDark] = pick(HAIRS, rnd);
+    return {
+      skin: pick(SKINS, rnd), hair, hairDark, style: pick(STYLES, rnd), eye: hairDark,
+      outfit: pick(OUTFITS, rnd), trim: pick(OUTFITS, rnd), legs: pick(['#2b3a55', '#3a3a3a', '#5c4a3a', '#1f2a44', '#6b7b8c'], rnd),
+      shoes: pick(['#111', '#f8f9fa', '#7a3f1d'], rnd), prop: pick(PROPS, rnd), flag: pick([['#1f5a36', '#f4c430'], ['#0b2a6b', '#ffffff'], ['#c92a2a', '#ffffff'], ['#78be20', '#ffffff']], rnd),
+      sign: pick(['GO W!', 'GO G!', 'DING!', 'GO GO!', 'MELB ♥'], rnd),
+    };
+  }
+
+  // A limb with a dark anime-style outline. Returns the end point.
   function limb(x1, y1, len, ang, width, color) {
     const x2 = x1 + Math.sin(ang) * len;
     const y2 = y1 + Math.cos(ang) * len;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = width;
     ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
+    for (const [c, w] of [[OUTLINE, width + 2.2], [color, width]]) {
+      ctx.strokeStyle = c;
+      ctx.lineWidth = w;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
     return [x2, y2];
   }
 
-  // Anime-style character, facing right, feet at (x, y).
+  function outlineFill(color) {
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = OUTLINE;
+    ctx.lineWidth = 1.1;
+    ctx.stroke();
+  }
+
+  // Anime-style character, facing right (or left with a.flip), feet at (x, y).
   function drawChar(x, y, look, a = {}) {
     const s = a.scale || 1;
     const phase = a.phase || 0;
     const moving = !!a.moving;
     ctx.save();
     ctx.translate(x, y - (a.jump || 0));
-    ctx.scale(s, s);
+    ctx.scale(a.flip ? -s : s, s);
 
     // Shadow
     ctx.fillStyle = 'rgba(0,0,0,0.22)';
@@ -231,86 +281,242 @@
     ctx.ellipse(0, 1 + (a.jump || 0) / s, 11, 3, 0, 0, Math.PI * 2);
     ctx.fill();
 
+    // Legs and shoes
     const swing = moving ? Math.sin(phase) * 0.9 : 0;
     const hipY = -22;
-    // Legs
-    const legC = look.legs;
-    const k1 = limb(-2, hipY, 11, swing, 5, legC);
-    limb(k1[0], k1[1], 11, swing - (moving ? Math.max(0, Math.sin(phase)) * 0.9 : 0), 5, legC);
-    const k2 = limb(2, hipY, 11, -swing, 5, legC);
-    limb(k2[0], k2[1], 11, -swing - (moving ? Math.max(0, -Math.sin(phase)) * 0.9 : 0), 5, legC);
-    // Shoes
-    ctx.fillStyle = look.style === 'twin' ? '#ffffff' : '#222';
+    const legs = [[-2, swing, Math.max(0, Math.sin(phase))], [2, -swing, Math.max(0, -Math.sin(phase))]];
+    for (const [hx, sw, bend] of legs) {
+      const knee = limb(hx, hipY, 11, sw, 5, look.legs);
+      const foot = limb(knee[0], knee[1], 11, sw - (moving ? bend * 0.9 : 0), 5, look.legs);
+      ctx.beginPath();
+      ctx.ellipse(foot[0] + 2, foot[1] + 1, 4, 2.4, 0, 0, Math.PI * 2);
+      outlineFill(look.shoes || '#222');
+    }
 
     // Arms. When cheering they go up and out in a wide V, drawn behind the
     // head so they never cover the face.
-    const arm = (shoulderX, ang, len, pomR) => {
-      const hand = limb(shoulderX, -36, len, ang, 4, look.skin);
+    const hand = (pt, pomR) => {
       if (look.pom) {
-        ctx.fillStyle = look.pom;
         ctx.beginPath();
-        ctx.arc(hand[0], hand[1], pomR, 0, Math.PI * 2);
+        ctx.arc(pt[0], pt[1], pomR, 0, Math.PI * 2);
+        outlineFill(look.pom);
+        ctx.fillStyle = 'rgba(255,255,255,0.45)';
+        ctx.beginPath();
+        ctx.arc(pt[0] - 1.5, pt[1] - 1.5, pomR * 0.4, 0, Math.PI * 2);
         ctx.fill();
       }
     };
     const wave = Math.sin(phase * 2) * 0.15;
     const armSwing = moving ? -Math.sin(phase) * 1.1 : 0.15;
+    let frontHand = null;
     if (a.armsUp) {
-      arm(-2, -(Math.PI - 1.2) - wave, 15, 5.5);
-      arm(3, Math.PI - 1.2 + wave, 15, 5.5);
+      const back = limb(-2, -36, 15, -(Math.PI - 1.2) - wave, 4, look.skin);
+      frontHand = limb(3, -36, 15, Math.PI - 1.2 + wave, 4, look.skin);
+      hand(back, 5.5);
+      hand(frontHand, 5.5);
+      drawHeldProp(look, back, frontHand, phase, true);
     } else {
-      arm(-2, -armSwing, 13, 5);
+      hand(limb(-2, -36, 13, -armSwing, 4, look.skin), 5);
     }
 
     // Body
-    ctx.fillStyle = look.outfit;
     roundRect(-7, -40, 14, 19, 5);
-    ctx.fill();
+    outlineFill(look.outfit);
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    ctx.fillRect(-7, -32, 5, 10);
     ctx.fillStyle = look.trim;
-    ctx.fillRect(-7, -27, 14, 2);
+    ctx.fillRect(-6.5, -27, 13, 2);
     if (look.skirt) {
-      ctx.fillStyle = look.skirt;
       ctx.beginPath();
       ctx.moveTo(-7, -24);
       ctx.lineTo(7, -24);
       ctx.lineTo(10 + Math.sin(phase * 2) * 1.5, -15);
       ctx.lineTo(-10 + Math.sin(phase * 2) * 1.5, -15);
       ctx.closePath();
-      ctx.fill();
+      outlineFill(look.skirt);
+    }
+    if (look.prop === 'scarf') {
+      const [c1, c2] = look.flag;
+      for (let i = 0; i < 4; i++) {
+        ctx.fillStyle = i % 2 ? c2 : c1;
+        ctx.fillRect(-7 + i * 3.5, -41, 3.5, 4);
+      }
+      ctx.fillStyle = c1;
+      ctx.fillRect(-9, -38, 3, 10);
     }
 
-    // Long hair behind the head
-    ctx.fillStyle = look.hairDark;
-    if (look.style === 'pony') {
-      const flow = moving ? Math.sin(phase * 2) * 3 : 0;
+    // Hair that sits behind the head
+    drawBackHair(look, phase, moving);
+
+    // Head
+    ctx.beginPath();
+    ctx.arc(1, -52, 12.5, 0, Math.PI * 2);
+    outlineFill(look.skin);
+    // Ear
+    ctx.beginPath();
+    ctx.ellipse(-6, -50, 2.2, 3, 0, 0, Math.PI * 2);
+    outlineFill(look.skin);
+
+    drawFrontHair(look);
+
+    // Driver's or camera operator's cap
+    if (look.cap) {
       ctx.beginPath();
+      ctx.ellipse(1, -63, 12, 5.5, 0, Math.PI, 0);
+      ctx.closePath();
+      outlineFill(look.cap);
+      ctx.fillStyle = look.cap;
+      ctx.fillRect(-11, -64, 24, 4);
+      ctx.beginPath();
+      ctx.rect(6, -61.5, 11, 2.5);
+      outlineFill(look.cap);
+      ctx.fillStyle = look.trim;
+      ctx.fillRect(-1, -67, 4, 3);
+    }
+
+    // Big anime eyes (three-quarter view)
+    const blink = a.blink ? 0.15 : 1;
+    for (const [ex, ew] of [[7, 3.4], [-1, 3]]) {
+      ctx.save();
+      ctx.translate(ex, -50);
+      ctx.scale(1, blink);
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, ew + 0.6, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      const iris = ctx.createLinearGradient(0, -4.4, 0, 4.4);
+      iris.addColorStop(0, '#111');
+      iris.addColorStop(0.35, look.eye);
+      iris.addColorStop(1, '#ffffff');
+      ctx.fillStyle = iris;
+      ctx.beginPath();
+      ctx.ellipse(0.6, 0.5, ew, 4.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#111';
+      ctx.beginPath();
+      ctx.ellipse(0.8, 1, ew * 0.45, 2.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(1.6, -1.5, 1.4, 0, Math.PI * 2);
+      ctx.arc(-0.6, 2.4, 0.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      // Upper lash line
+      ctx.strokeStyle = '#1a1010';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(ex - ew - 0.8, -54.6);
+      ctx.quadraticCurveTo(ex, -56.2, ex + ew + 1, -55);
+      ctx.stroke();
+      // Brow
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = look.hairDark;
+      ctx.beginPath();
+      ctx.moveTo(ex - ew, -58.5);
+      ctx.lineTo(ex + ew, -59);
+      ctx.stroke();
+    }
+    // Nose, blush and mouth
+    ctx.strokeStyle = 'rgba(120,60,50,0.6)';
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(11.5, -48);
+    ctx.lineTo(12.2, -46);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,120,140,0.45)';
+    ctx.beginPath();
+    ctx.ellipse(9.5, -44.5, 2.6, 1.3, 0, 0, Math.PI * 2);
+    ctx.ellipse(-2, -44.5, 2, 1.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+    const open = a.shout || (a.talk && Math.sin(phase * 7) > 0);
+    if (open) {
+      ctx.beginPath();
+      ctx.ellipse(6, -42, 2, 2, 0, 0, Math.PI * 2);
+      ctx.fillStyle = '#7a2a2a';
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = '#7a3030';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(6, -43, 2, 0.2, Math.PI - 0.2);
+      ctx.stroke();
+    }
+
+    // Front arm, held below the face
+    if (!a.armsUp) {
+      let ang = armSwing;
+      let len = 13;
+      if (a.pose === 'mic') { ang = 1.75; len = 10; }
+      if (a.pose === 'camera') { ang = 1.5; len = 11; }
+      if (a.pose === 'phone') { ang = 2.1; len = 11; }
+      frontHand = limb(3, -36, len, ang, 4, look.skin);
+      ctx.strokeStyle = look.outfit;
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(3, -36);
+      ctx.lineTo(3 + Math.sin(ang) * 4, -36 + Math.cos(ang) * 4);
+      ctx.stroke();
+      hand(frontHand, 5.5);
+      if (a.pose === 'mic') drawMic(frontHand);
+      if (a.pose === 'camera') drawCamera(phase);
+      if (a.pose === 'phone' || (look.prop === 'phone' && !moving)) drawPhone(frontHand);
+    }
+    ctx.restore();
+  }
+
+  function drawBackHair(look, phase, moving) {
+    ctx.fillStyle = look.hairDark;
+    ctx.strokeStyle = OUTLINE;
+    ctx.lineWidth = 1.1;
+    const flow = moving ? Math.sin(phase * 2) * 3 : 0;
+    ctx.beginPath();
+    if (look.style === 'pony') {
       ctx.moveTo(-8, -58);
       ctx.quadraticCurveTo(-22, -52 + flow, -18, -36 + flow);
       ctx.quadraticCurveTo(-12, -46, -6, -50);
-      ctx.fill();
     } else if (look.style === 'twin') {
       for (const side of [-1, 1]) {
         const bob = Math.sin(phase * 2 + side) * 3;
-        ctx.beginPath();
+        ctx.moveTo(side * 13 - 2 + 5, -48 + bob);
         ctx.ellipse(side * 13 - 2, -48 + bob, 5, 11, side * 0.3, 0, Math.PI * 2);
-        ctx.fill();
       }
+    } else if (look.style === 'long') {
+      ctx.moveTo(-12, -58);
+      ctx.quadraticCurveTo(-18, -40, -14 + flow, -30);
+      ctx.lineTo(4, -34);
+      ctx.lineTo(10, -44);
+      ctx.lineTo(12, -58);
+    } else if (look.style === 'bob') {
+      ctx.moveTo(-13, -58);
+      ctx.quadraticCurveTo(-16, -44, -10, -40);
+      ctx.lineTo(10, -40);
+      ctx.quadraticCurveTo(15, -46, 13, -58);
+    } else if (look.style === 'bun') {
+      ctx.arc(-6, -66, 6, 0, Math.PI * 2);
+    } else {
+      return;
     }
-
-    // Head
-    ctx.fillStyle = look.skin;
-    ctx.beginPath();
-    ctx.arc(1, -52, 12.5, 0, Math.PI * 2);
+    ctx.closePath();
     ctx.fill();
+    ctx.stroke();
+  }
 
-    // Front hair
-    ctx.fillStyle = look.hair;
+  function drawFrontHair(look) {
     ctx.beginPath();
     if (look.style === 'spiky') {
       ctx.moveTo(-13, -50);
       const spikes = [[-16, -62], [-9, -61], [-8, -72], [-1, -64], [4, -74], [8, -64], [16, -68], [13, -56], [17, -52], [10, -55], [6, -50], [3, -56], [-2, -50], [-6, -55]];
       for (const [px, py] of spikes) ctx.lineTo(px, py);
-      ctx.closePath();
+    } else if (look.style === 'short') {
+      ctx.moveTo(-12, -48);
+      ctx.quadraticCurveTo(-13, -67, 2, -66);
+      ctx.quadraticCurveTo(15, -66, 14, -54);
+      ctx.lineTo(9, -57);
+      ctx.lineTo(5, -54);
+      ctx.lineTo(1, -58);
+      ctx.lineTo(-4, -56);
+      ctx.lineTo(-8, -52);
     } else {
       ctx.moveTo(-12, -48);
       ctx.quadraticCurveTo(-12, -68, 2, -66);
@@ -321,9 +527,15 @@
       ctx.lineTo(0, -51);
       ctx.lineTo(-4, -57);
       ctx.lineTo(-8, -50);
-      ctx.closePath();
     }
-    ctx.fill();
+    ctx.closePath();
+    outlineFill(look.hair);
+    // Glossy anime highlight
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(1, -54, 9, -2.5, -1.4);
+    ctx.stroke();
     if (look.style === 'twin') {
       ctx.fillStyle = look.pom || '#fff';
       ctx.beginPath();
@@ -331,67 +543,90 @@
       ctx.arc(11, -60, 2.5, 0, Math.PI * 2);
       ctx.fill();
     }
+  }
 
-    // Driver's cap
-    if (look.cap) {
-      ctx.fillStyle = look.cap;
+  function drawHeldProp(look, back, front, phase, up) {
+    if (!up) return;
+    if (look.prop === 'flag') {
+      const [c1, c2] = look.flag;
+      ctx.strokeStyle = '#5a4030';
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.ellipse(1, -63, 12, 5, 0, Math.PI, 0);
-      ctx.fill();
-      ctx.fillRect(-11, -64, 24, 4);
-      ctx.fillRect(6, -61, 11, 2.5);
-      ctx.fillStyle = look.trim;
-      ctx.fillRect(-1, -66, 4, 3);
-    }
-
-    // Big anime eyes (three-quarter view, looking right)
-    for (const [ex, ew] of [[7, 3.4], [-1, 3]]) {
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.ellipse(ex, -50, ew + 0.6, 5, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = look.eye;
-      ctx.beginPath();
-      ctx.ellipse(ex + 0.6, -49.5, ew, 4.4, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#111';
-      ctx.beginPath();
-      ctx.ellipse(ex + 0.8, -49, ew * 0.5, 2.4, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(ex + 1.6, -51.5, 1.3, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#2a1a1a';
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.moveTo(ex - ew - 0.5, -55);
-      ctx.lineTo(ex + ew + 0.8, -55.6);
+      ctx.moveTo(front[0], front[1] + 4);
+      ctx.lineTo(front[0] + 2, front[1] - 22);
       ctx.stroke();
+      const f = Math.sin(phase * 3) * 2;
+      ctx.beginPath();
+      ctx.moveTo(front[0] + 2, front[1] - 22);
+      ctx.quadraticCurveTo(front[0] + 10, front[1] - 24 + f, front[0] + 18, front[1] - 21);
+      ctx.lineTo(front[0] + 18, front[1] - 11);
+      ctx.quadraticCurveTo(front[0] + 10, front[1] - 14 + f, front[0] + 2, front[1] - 12);
+      ctx.closePath();
+      outlineFill(c1);
+      ctx.fillStyle = c2;
+      ctx.fillRect(front[0] + 4, front[1] - 18 + f / 2, 12, 2.5);
+    } else if (look.prop === 'sign') {
+      ctx.strokeStyle = '#7a5a3a';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(back[0], back[1]);
+      ctx.lineTo(back[0] + 2, -80);
+      ctx.moveTo(front[0], front[1]);
+      ctx.lineTo(front[0] - 2, -80);
+      ctx.stroke();
+      roundRect(back[0] - 6, -96, front[0] - back[0] + 12, 18, 2);
+      outlineFill('#fffbe6');
+      ctx.font = `900 9px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = look.trim === '#f8f9fa' ? '#c92a2a' : look.trim;
+      ctx.fillText(look.sign, (back[0] + front[0]) / 2, -84);
+    } else if (look.prop === 'phone') {
+      drawPhone(front);
     }
-    // Blush and mouth
-    ctx.fillStyle = 'rgba(255,120,140,0.45)';
+  }
+
+  function drawPhone(p) {
+    roundRect(p[0] - 2, p[1] - 9, 6, 10, 1.5);
+    outlineFill('#22262b');
+    ctx.fillStyle = '#74c0fc';
+    ctx.fillRect(p[0] - 1, p[1] - 8, 4, 7);
+  }
+
+  function drawMic(p) {
+    ctx.strokeStyle = '#111';
+    ctx.lineWidth = 2.2;
     ctx.beginPath();
-    ctx.ellipse(9, -44, 2.6, 1.4, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#7a3030';
-    ctx.lineWidth = 1.3;
-    ctx.beginPath();
-    if (a.shout) ctx.ellipse(6, -42, 2, 2, 0, 0, Math.PI * 2);
-    else ctx.arc(6, -43, 2, 0.2, Math.PI - 0.2);
+    ctx.moveTo(p[0], p[1] + 2);
+    ctx.lineTo(p[0] + 4, p[1] - 5);
     ctx.stroke();
+    ctx.fillStyle = '#d6336c';
+    ctx.fillRect(p[0] + 0.5, p[1] - 4, 5, 4);
+    ctx.beginPath();
+    ctx.arc(p[0] + 5, p[1] - 7, 2.8, 0, Math.PI * 2);
+    outlineFill('#555');
+  }
 
-    // Front arm
-    if (!a.armsUp) {
-      arm(3, armSwing, 13, 5.5);
-      ctx.strokeStyle = look.outfit;
-      ctx.lineWidth = 5;
+  // Shoulder-mounted TV camera, held below the operator's face.
+  function drawCamera(phase) {
+    roundRect(-2, -42, 26, 12, 3);
+    outlineFill('#3a3f46');
+    ctx.fillStyle = '#d6336c';
+    ctx.fillRect(2, -39, 10, 3);
+    roundRect(22, -40.5, 9, 9, 2);
+    outlineFill('#1b1d20');
+    ctx.fillStyle = '#4dabf7';
+    ctx.beginPath();
+    ctx.arc(31, -36, 3, -Math.PI / 2, Math.PI / 2);
+    ctx.fill();
+    ctx.fillStyle = '#22262b';
+    ctx.fillRect(4, -46, 12, 4);
+    // Recording light
+    if (Math.sin(phase * 3) > 0) {
+      ctx.fillStyle = '#ff2d2d';
       ctx.beginPath();
-      ctx.moveTo(3, -36);
-      ctx.lineTo(3 + Math.sin(armSwing) * 5, -36 + Math.cos(armSwing) * 5);
-      ctx.stroke();
+      ctx.arc(19, -44, 1.6, 0, Math.PI * 2);
+      ctx.fill();
     }
-    ctx.restore();
   }
 
   // ---- State --------------------------------------------------------------
@@ -595,14 +830,17 @@
   }
 
   function updateCheer(dt) {
-    for (const c of course.cheer) {
+    for (const c of course.people) {
       c.t += dt;
-      const near = racers.some((r) => Math.abs(r.x - c.x) < 30);
-      c.excited = near;
-      if (!c.said && Math.abs(player.x - c.x) < 18 && player.phase === 'drive') {
+      c.excited = racers.some((r) => Math.abs(r.x - c.x) < 30 || (r.phase !== 'drive' && Math.abs(r.runX - c.x) < 12));
+      const near = Math.abs(player.x - c.x) < 18 && player.phase === 'drive';
+      if (c.kind === 'cheer' && !c.said && near) {
         c.said = true;
-        bubbles.push({ x: c.x, side: c.side, text: pick(['GO GO!', 'Faster!', 'Ganbatte!', 'You got this!', 'Ding ding!'], Math.random), t: 1.6 });
+        bubbles.push({ x: c.x, side: c.side, text: pick(['GO GO!', 'Faster!', 'Ganbatte!', 'You got this!', 'Ding ding!'], Math.random), t: 1.6, color: '#d63384' });
         sfx.cheer();
+      } else if (c.kind === 'reporter' && !c.said && (near || (c.x < 0 && state === 'race'))) {
+        c.said = true;
+        bubbles.push({ x: c.x, side: c.side, text: c.line, t: 2.2, color: '#1864ab' });
       }
     }
     for (const b of bubbles) b.t -= dt;
@@ -725,6 +963,54 @@
 
   const sx = (x) => (x - camX) * PX;
 
+  // Soft top light and bottom shade over a body that is already clipped.
+  function shadeBody(x, top, w, h, strength = 1) {
+    const g = ctx.createLinearGradient(0, top, 0, top + h);
+    g.addColorStop(0, `rgba(255,255,255,${0.32 * strength})`);
+    g.addColorStop(0.22, 'rgba(255,255,255,0)');
+    g.addColorStop(0.75, 'rgba(0,0,0,0)');
+    g.addColorStop(1, `rgba(0,0,0,${0.28 * strength})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(x, top, w, h);
+  }
+
+  // Diagonal sky reflections across a pane of glass.
+  function glint(x, y, w, h) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.clip();
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    const off = ((x * 0.37) % 30 + 30) % 30;
+    for (let gx = x - h - off; gx < x + w; gx += 30) {
+      ctx.beginPath();
+      ctx.moveTo(gx, y + h);
+      ctx.lineTo(gx + h, y);
+      ctx.lineTo(gx + h + 7, y);
+      ctx.lineTo(gx + 7, y + h);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // Fine speckle texture for asphalt and paving, built once.
+  let grit = null;
+  function gritPattern() {
+    if (grit) return grit;
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const g = c.getContext('2d');
+    const rnd = mulberry32(7);
+    for (let i = 0; i < 1400; i++) {
+      const v = rnd() < 0.5 ? 0 : 255;
+      g.fillStyle = `rgba(${v},${v},${v},${0.04 + rnd() * 0.07})`;
+      g.fillRect(rnd() * 128, rnd() * 128, 1 + rnd() * 1.5, 1 + rnd() * 1.5);
+    }
+    grit = ctx.createPattern(c, 'repeat');
+    return grit;
+  }
+
+
   // ---- Scenery ------------------------------------------------------------
   function drawSky() {
     const g = ctx.createLinearGradient(0, 0, 0, BACK_PATH_TOP);
@@ -732,6 +1018,12 @@
     g.addColorStop(0.7, '#a9d1ee');
     g.addColorStop(1, '#e4eff5');
     ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, BACK_PATH_TOP);
+    const sun = ctx.createRadialGradient(820, 40, 4, 820, 40, 260);
+    sun.addColorStop(0, 'rgba(255,250,220,0.95)');
+    sun.addColorStop(0.08, 'rgba(255,240,190,0.6)');
+    sun.addColorStop(1, 'rgba(255,240,190,0)');
+    ctx.fillStyle = sun;
     ctx.fillRect(0, 0, W, BACK_PATH_TOP);
     // A few soft clouds drifting slowly
     ctx.fillStyle = 'rgba(255,255,255,0.75)';
@@ -874,6 +1166,16 @@
     const top = base - h;
     ctx.fillStyle = s.color;
     ctx.fillRect(x, top, w, h);
+    // Rendered brick courses and a soft light falloff
+    ctx.fillStyle = 'rgba(0,0,0,0.05)';
+    for (let yy = top + 10; yy < base; yy += 6) ctx.fillRect(x, yy, w, 1);
+    const fg = ctx.createLinearGradient(x, 0, x + w, 0);
+    fg.addColorStop(0, 'rgba(255,255,255,0.10)');
+    fg.addColorStop(1, 'rgba(0,0,0,0.12)');
+    ctx.fillStyle = fg;
+    ctx.fillRect(x, top, w, h);
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fillRect(x + w - 2, top, 2, h);
     // Parapet with a little pediment
     ctx.fillStyle = 'rgba(0,0,0,0.12)';
     ctx.fillRect(x, top, w, 8);
@@ -955,18 +1257,65 @@
     }
   }
 
-  function drawStreet() {
-    // Back footpath
+  // The street surface (footpaths, asphalt, texture) never changes, so it is
+  // painted once into a wide strip and slid along with the camera.
+  let streetLayer = null;
+  function buildStreetLayer() {
+    const c = document.createElement('canvas');
+    const w = W + 128;
+    c.width = w * DPR;
+    c.height = H * DPR;
+    const real = ctx;
+    ctx = c.getContext('2d');
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const saveCam = camX;
+    camX = 0;
     ctx.fillStyle = '#c9c4b8';
-    ctx.fillRect(0, BACK_PATH_TOP, W, STREET_TOP - BACK_PATH_TOP);
+    ctx.fillRect(0, BACK_PATH_TOP, w, STREET_TOP - BACK_PATH_TOP);
     ctx.fillStyle = '#9e978a';
-    ctx.fillRect(0, STREET_TOP - 4, W, 4);
-    // Road
+    ctx.fillRect(0, STREET_TOP - 4, w, 4);
     const g = ctx.createLinearGradient(0, STREET_TOP, 0, FRONT_PATH_TOP);
     g.addColorStop(0, '#5b5f66');
     g.addColorStop(1, '#474b52');
     ctx.fillStyle = g;
-    ctx.fillRect(0, STREET_TOP, W, FRONT_PATH_TOP - STREET_TOP);
+    ctx.fillRect(0, STREET_TOP, w, FRONT_PATH_TOP - STREET_TOP);
+    const sh = ctx.createLinearGradient(0, BACK_PATH_TOP, 0, BACK_PATH_TOP + 14);
+    sh.addColorStop(0, 'rgba(0,0,0,0.18)');
+    sh.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = sh;
+    ctx.fillRect(0, BACK_PATH_TOP, w, 14);
+    ctx.fillStyle = '#d3cec2';
+    ctx.fillRect(0, FRONT_PATH_TOP, w, H - FRONT_PATH_TOP);
+    ctx.fillStyle = '#a39c8f';
+    ctx.fillRect(0, FRONT_PATH_TOP, w, 5);
+    ctx.fillStyle = gritPattern();
+    ctx.fillRect(0, BACK_PATH_TOP, w, STREET_TOP - 4 - BACK_PATH_TOP);
+    ctx.fillRect(0, STREET_TOP, w, FRONT_PATH_TOP - STREET_TOP);
+    ctx.fillRect(0, FRONT_PATH_TOP + 5, w, H - FRONT_PATH_TOP - 5);
+    camX = saveCam;
+    ctx = real;
+    return c;
+  }
+
+  let vignetteLayer = null;
+  function buildVignette() {
+    const c = document.createElement('canvas');
+    c.width = W * DPR;
+    c.height = H * DPR;
+    const g2 = c.getContext('2d');
+    g2.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const vg = g2.createRadialGradient(W / 2, H / 2, H * 0.45, W / 2, H / 2, H * 1.05);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, 'rgba(0,0,0,0.28)');
+    g2.fillStyle = vg;
+    g2.fillRect(0, 0, W, H);
+    return c;
+  }
+
+  function drawStreet() {
+    if (!streetLayer) streetLayer = buildStreetLayer();
+    const tex = (((camX * PX) % 128) + 128) % 128;
+    ctx.drawImage(streetLayer, 0, BACK_PATH_TOP * DPR, (W + 128) * DPR, (H - BACK_PATH_TOP) * DPR, -tex, BACK_PATH_TOP, W + 128, H - BACK_PATH_TOP);
     // Yellow tram-lane lines
     ctx.fillStyle = '#e6c229';
     const off = ((camX * PX) % 60 + 60) % 60;
@@ -975,11 +1324,7 @@
       ctx.fillRect(x, FRONT_PATH_TOP - 10, 34, 3);
     }
     ctx.fillRect(0, (RAIL_Y[0] + RAIL_Y[1]) / 2 - 22, W, 3);
-    // Front footpath
-    ctx.fillStyle = '#d3cec2';
-    ctx.fillRect(0, FRONT_PATH_TOP, W, H - FRONT_PATH_TOP);
-    ctx.fillStyle = '#a39c8f';
-    ctx.fillRect(0, FRONT_PATH_TOP, W, 5);
+    // Paving joints
     ctx.fillStyle = 'rgba(0,0,0,0.07)';
     for (let x = -(((camX * PX) % 42) + 42) % 42; x < W; x += 42) {
       ctx.fillRect(x, FRONT_PATH_TOP + 5, 1.5, H - FRONT_PATH_TOP);
@@ -1300,7 +1645,20 @@
     ctx.fillStyle = '#d6b043';
     ctx.fillRect(x, top + 26, L, 2);
     ctx.fillRect(x, bot - 6, L, 1.5);
+    // Panel joints and rivets
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    for (let px2 = x + 24; px2 < x + L - 10; px2 += 21) ctx.fillRect(px2, top + 29, 1, bot - top - 31);
+    ctx.fillStyle = 'rgba(255,230,150,0.55)';
+    for (let px2 = x + 8; px2 < x + L - 6; px2 += 7) ctx.fillRect(px2, top + 30.5, 1.2, 1.2);
+    shadeBody(x, top, L, bot - top);
     ctx.restore();
+    // Slatted lifeguard trays under both ends
+    for (const lx of [x - 2, x + L - 16]) {
+      ctx.fillStyle = '#222';
+      ctx.fillRect(lx, bot - 1, 18, 4);
+      ctx.fillStyle = '#555';
+      for (let k = 0; k < 18; k += 4) ctx.fillRect(lx + k, bot - 1, 2, 4);
+    }
 
     // Windows
     const doorX = x + L - r.door * PX;
@@ -1309,10 +1667,12 @@
       if (Math.abs(wx + 7 - doorX) < 22) continue;
       ctx.fillStyle = '#2d3c4a';
       ctx.fillRect(wx, top + 6, 14, 17);
-      ctx.fillStyle = 'rgba(255,255,255,0.25)';
-      ctx.fillRect(wx + 2, top + 8, 4, 13);
+      glint(wx, top + 6, 14, 17);
       ctx.fillStyle = '#efe4c2';
       ctx.fillRect(wx, top + 12, 14, 1.5);
+      ctx.strokeStyle = '#8a7a55';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(wx + 0.5, top + 6.5, 13, 16);
     }
     // Cab windows at each end
     ctx.fillStyle = '#2d3c4a';
@@ -1428,6 +1788,8 @@
         ctx.lineTo(b - 30, top + 34);
         ctx.fill();
       }
+      glint(a, top + 8, w, 24);
+      shadeBody(a, top, w, bot - top);
       ctx.restore();
       if (i < 2) fillRR(b, top + 4, 6, bot - top - 8, 2, '#1b1b1b');
     }
@@ -1467,31 +1829,108 @@
     if (r.trip > 0) outlined('!?', x + 6, y - 82, 18, '#ffffff');
   }
 
-  function drawCheerleaders(side) {
-    for (const c of course.cheer) {
-      if (c.side !== side) continue;
-      const x = sx(c.x);
-      if (x < -40 || x > W + 40) continue;
-      const feet = side === 0 ? BACK_FEET : FRONT_FEET;
-      const hop = c.excited ? Math.abs(Math.sin(c.t * 7)) * 16 : Math.abs(Math.sin(c.t * 2)) * 2;
-      drawChar(x, feet, c.look, { armsUp: c.excited, phase: c.t * 3.5, jump: hop, shout: c.excited, scale: 1 });
+  function drawNewsVan(v) {
+    const L = 6 * PX;
+    const x = sx(v.x);
+    if (x > W + 40 || x + L < -40) return;
+    const base = BACK_FEET - 2;
+    const top = base - 46;
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.beginPath();
+    ctx.ellipse(x + L / 2, base + 2, L / 2, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Satellite dish and mast
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x + 22, top);
+    ctx.lineTo(x + 22, top - 14);
+    ctx.stroke();
+    ctx.fillStyle = '#e9ecef';
+    ctx.beginPath();
+    ctx.ellipse(x + 22, top - 18, 12, 6, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#adb5bd';
+    ctx.stroke();
+    // Body
+    ctx.beginPath();
+    ctx.moveTo(x, top + 4);
+    ctx.lineTo(x + L - 22, top + 4);
+    ctx.quadraticCurveTo(x + L - 6, top + 8, x + L - 2, top + 24);
+    ctx.lineTo(x + L, base - 8);
+    ctx.lineTo(x, base - 8);
+    ctx.closePath();
+    const g = ctx.createLinearGradient(0, top, 0, base);
+    g.addColorStop(0, '#ffffff');
+    g.addColorStop(1, '#ced4da');
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.strokeStyle = '#868e96';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = '#d6336c';
+    ctx.fillRect(x, top + 26, L - 1, 6);
+    label('TN7 NEWS', x + 28, top + 22, 11, '#1864ab', 'center', '900');
+    ctx.fillStyle = '#26323d';
+    ctx.beginPath();
+    ctx.moveTo(x + L - 22, top + 9);
+    ctx.quadraticCurveTo(x + L - 8, top + 11, x + L - 5, top + 22);
+    ctx.lineTo(x + L - 22, top + 22);
+    ctx.fill();
+    for (const wx of [x + 14, x + L - 16]) {
+      ctx.fillStyle = '#1a1a1a';
+      ctx.beginPath();
+      ctx.arc(wx, base - 7, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#adb5bd';
+      ctx.beginPath();
+      ctx.arc(wx, base - 7, 3, 0, Math.PI * 2);
+      ctx.fill();
     }
+  }
+
+  function drawPerson(c) {
+    const x = sx(c.x);
+    if (x < -40 || x > W + 40) return;
+    const feet = c.side === 0 ? BACK_FEET : FRONT_FEET;
+    const blink = Math.sin(c.t * 1.3 + c.x) > 0.985;
+    if (c.kind === 'cheer') {
+      const hop = c.excited ? Math.abs(Math.sin(c.t * 7)) * 16 : Math.abs(Math.sin(c.t * 2)) * 2;
+      drawChar(x, feet, c.look, { armsUp: c.excited, phase: c.t * 3.5, jump: hop, shout: c.excited, blink });
+    } else if (c.kind === 'fan') {
+      const prop = c.look.prop;
+      const up = c.excited && prop !== 'phone';
+      const hop = c.excited ? Math.abs(Math.sin(c.t * 5 + c.x)) * 6 : 0;
+      drawChar(x, feet, c.look, { armsUp: up || prop === 'sign', phase: c.t * 3, jump: hop, shout: c.excited && prop !== 'phone', scale: c.scale, blink, pose: prop === 'phone' && c.excited ? 'phone' : null });
+    } else if (c.kind === 'camera') {
+      drawChar(x, feet, c.look, { flip: c.flip, pose: 'camera', phase: c.t * 3, blink });
+    } else {
+      drawChar(x, feet, c.look, { flip: c.flip, pose: 'mic', talk: true, phase: c.t * 3, blink });
+    }
+  }
+
+  function drawCrowd(side) {
+    for (const v of course.vans) if (v.side === side) drawNewsVan(v);
+    for (const c of course.people) if (c.side === side) drawPerson(c);
     for (const b of bubbles) {
       if (b.side !== side) continue;
       const x = sx(b.x);
       const feet = side === 0 ? BACK_FEET : FRONT_FEET;
       const y = feet - 100 - (1.6 - b.t) * 10;
-      ctx.globalAlpha = Math.min(1, b.t * 3);
+      ctx.globalAlpha = clamp(b.t * 3, 0, 1);
       ctx.font = `bold 14px ${FONT}`;
       const w = ctx.measureText(b.text).width + 18;
+      ctx.shadowColor = 'rgba(0,0,0,0.25)';
+      ctx.shadowBlur = 6;
       fillRR(x - w / 2, y - 18, w, 24, 10, '#ffffff');
+      ctx.shadowBlur = 0;
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
       ctx.moveTo(x - 4, y + 5);
       ctx.lineTo(x + 6, y + 14);
       ctx.lineTo(x + 6, y + 5);
       ctx.fill();
-      label(b.text, x, y - 1, 14, '#d63384');
+      label(b.text, x, y - 1, 14, b.color);
       ctx.globalAlpha = 1;
     }
   }
@@ -1511,6 +1950,22 @@
     ctx.fillRect(x - 4, BACK_FEET - 170, 6, 170);
     fillRR(x - 70, BACK_FEET - 176, 150, 30, 6, '#d0021b');
     label('FINISH', x + 5, BACK_FEET - 154, 18, '#ffffff', 'center', '900');
+  }
+
+  // Faint streaks over the street when the player is flying along.
+  function drawSpeedLines() {
+    const k = clamp((player.v - 14) / 10, 0, 1);
+    if (k <= 0 || player.phase !== 'drive') return;
+    ctx.strokeStyle = `rgba(255,255,255,${0.18 * k})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 0; i < 14; i++) {
+      const y = STREET_TOP + ((i * 37) % (FRONT_PATH_TOP - STREET_TOP));
+      const x = W - ((camX * PX * 1.6 + i * 173) % (W + 200));
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + 60 + 80 * k, y);
+    }
+    ctx.stroke();
   }
 
   function drawParticles() {
@@ -1533,14 +1988,14 @@
 
   function drawHUD() {
     // Left: position and time
-    fillRR(12, 10, 196, 54, 12, 'rgba(15,20,30,0.72)');
+    fillRR(12, 10, 286, 60, 12, 'rgba(15,20,30,0.72)');
     const pos = standingOf(player);
     outlined(pos === 1 ? '1st' : '2nd', 28, 52, 34, pos === 1 ? '#ffd43b' : '#dee2e6', '#000', 'left');
     label('TIME', 110, 30, 11, '#adb5bd', 'left');
     label(fmtTime(player.finished ? player.finishTime : raceTime), 110, 52, 20, '#ffffff', 'left');
 
     // Centre: progress
-    const x0 = 250;
+    const x0 = 330;
     const x1 = 690;
     fillRR(x0 - 14, 14, x1 - x0 + 28, 30, 12, 'rgba(15,20,30,0.72)');
     ctx.fillStyle = '#495057';
@@ -1580,20 +2035,16 @@
     }
 
     // Speedometer
-    const cx = W / 2;
-    const cy = H - 6;
-    ctx.fillStyle = 'rgba(15,20,30,0.78)';
-    ctx.beginPath();
-    ctx.arc(cx, cy, 64, Math.PI, 0);
-    ctx.fill();
+    const cx = 254;
+    const cy = 60;
     ctx.strokeStyle = '#495057';
-    ctx.lineWidth = 6;
+    ctx.lineWidth = 5;
     ctx.beginPath();
-    ctx.arc(cx, cy, 52, Math.PI, 0);
+    ctx.arc(cx, cy, 36, Math.PI, 0);
     ctx.stroke();
     ctx.strokeStyle = '#f03e3e';
     ctx.beginPath();
-    ctx.arc(cx, cy, 52, Math.PI + Math.PI * (40 / 100), Math.PI + Math.PI * (40 / 100) + 0.05);
+    ctx.arc(cx, cy, 36, Math.PI + Math.PI * 0.4, Math.PI + Math.PI * 0.4 + 0.07);
     ctx.stroke();
     const sp = player.phase === 'drive' ? kmh(player.v) : 0;
     const ang = Math.PI + Math.PI * clamp(sp / 100, 0, 1);
@@ -1601,26 +2052,38 @@
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + Math.cos(ang) * 46, cy + Math.sin(ang) * 46);
+    ctx.lineTo(cx + Math.cos(ang) * 32, cy + Math.sin(ang) * 32);
     ctx.stroke();
-    label(String(sp), cx, cy - 16, 20, '#ffffff');
-    label('km/h', cx, cy - 4, 9, '#adb5bd');
+    label(String(sp), cx, cy - 8, 15, '#ffffff');
+    label('km/h', cx, cy + 4, 8, '#adb5bd');
 
-    // On-screen pedals (work with mouse and touch too)
-    drawPedal(16, H - 78, 'BRAKE', '← / A', brakeHeld(), '#c92a2a');
-    drawPedal(W - 176, H - 78, player.phase === 'drive' ? 'POWER' : 'RUN', '→ / D', powerHeld(), '#2b8a3e');
+    // On-screen pedals: big on touch screens, small and faint with a keyboard
+    // so they don't hide the crowd on the front footpath.
+    const pw = player.phase === 'drive' ? 'POWER' : 'RUN';
+    drawPedal('brake', 'BRAKE', '← / A', brakeHeld(), '#c92a2a');
+    drawPedal('power', pw, '→ / D', powerHeld(), '#2b8a3e');
   }
 
-  const PEDALS = { brake: [16, H - 78, 160, 66], power: [W - 176, H - 78, 160, 66] };
+  const TOUCH = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || 'ontouchstart' in window;
+  const PEDALS = TOUCH
+    ? { brake: [16, H - 78, 160, 66], power: [W - 176, H - 78, 160, 66] }
+    : { brake: [12, H - 40, 96, 30], power: [W - 108, H - 40, 96, 30] };
 
-  function drawPedal(x, y, text, keysText, on, color) {
-    fillRR(x, y, 160, 66, 16, on ? color : 'rgba(15,20,30,0.55)');
+  function drawPedal(name, text, keysText, on, color) {
+    const [x, y, w, h] = PEDALS[name];
+    ctx.globalAlpha = TOUCH || on ? 1 : 0.6;
+    fillRR(x, y, w, h, h / 4, on ? color : 'rgba(15,20,30,0.55)');
     ctx.strokeStyle = on ? '#ffffff' : 'rgba(255,255,255,0.35)';
     ctx.lineWidth = 2;
-    roundRect(x, y, 160, 66, 16);
+    roundRect(x, y, w, h, h / 4);
     ctx.stroke();
-    label(text, x + 80, y + 34, 22, '#ffffff', 'center', '900');
-    label(keysText, x + 80, y + 54, 12, 'rgba(255,255,255,0.7)');
+    if (TOUCH) {
+      label(text, x + w / 2, y + 34, 22, '#ffffff', 'center', '900');
+      label(keysText, x + w / 2, y + 54, 12, 'rgba(255,255,255,0.7)');
+    } else {
+      label(`${text}  ${keysText.split(' / ')[0]}`, x + w / 2, y + 20, 13, '#ffffff', 'center', '900');
+    }
+    ctx.globalAlpha = 1;
   }
 
   function drawBigText(text, sub, alpha = 1) {
@@ -1660,7 +2123,7 @@
     drawStops();
     drawZones();
     drawSignals(0);
-    drawCheerleaders(0);
+    drawCrowd(0);
     drawRunner(cpu);
     for (const c of course.crossings) drawCar(c, 0, RAIL_Y[0] + 1);
     drawTrack(0);
@@ -1673,9 +2136,12 @@
     drawFinish();
     drawFrontPoles();
     drawSignals(1);
-    drawCheerleaders(1);
+    drawCrowd(1);
     drawRunner(player);
     drawParticles();
+    drawSpeedLines();
+    if (!vignetteLayer) vignetteLayer = buildVignette();
+    ctx.drawImage(vignetteLayer, 0, 0, W, H);
 
     if (state === 'title') {
       drawPanel('TRAM RACER', [
