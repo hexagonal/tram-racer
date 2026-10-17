@@ -11,7 +11,8 @@
 
   // ---- Tuning -------------------------------------------------------------
   const PX = 14;                 // pixels per metre
-  const TRACK_LEN = 1400;        // metres from the start line to the finish
+  const BASE_TRACK_LEN = 1400;   // shortest race, in metres
+  let TRACK_LEN = BASE_TRACK_LEN; // this race's start-to-finish length (up to double the base)
   const START_X = 24;            // where both trams' noses start
   const RUN_DIST = 34;           // metres each driver runs to reach their door
   const RUN_SPEED = 7;           // m/s while holding power
@@ -141,6 +142,7 @@
 
   function makeCourse(seed) {
     const rnd = mulberry32(seed);
+    TRACK_LEN = Math.round(BASE_TRACK_LEN * (1 + rnd()));
     const slowZones = [];
     const crossings = [];
     // Every race gets a fresh layout: where the curves and crossings are,
@@ -180,14 +182,22 @@
     // (with some jitter) along the course on alternating footpaths.
     let fi = 0;
     for (const [fx, side] of [[-12, 0], [-8, 1], [TRACK_LEN - 4, 0], [TRACK_LEN + 9, 0], [TRACK_LEN + 18, 1], [TRACK_LEN + 1, 1]]) addFan(fx, side, fi++);
-    // Someone at the start has an opinion about all this.
-    Object.assign(people.find((p) => p.kind === 'fan' && p.x === -8).look, { prop: 'sign', sign: 'THIS GAME IS SILLY' });
     const spread = fanCount - fi;
     for (let k = 0; k < spread; k++) {
       const side = rnd() < 0.5 ? 0 : 1;
       let fx = 60 + (k + 0.5) * ((TRACK_LEN - 80) / spread) + (rnd() - 0.5) * 30;
       for (let tries = 0; tries < 8 && !clearOf(fx, side); tries++) fx += 3;
       addFan(fx, side, fi++);
+    }
+    // Somewhere in the middle of the race, never near the start or finish,
+    // a spectator has an opinion about all this.
+    {
+      let fx = TRACK_LEN * (0.25 + rnd() * 0.5);
+      const side = Math.floor(rnd() * 1000) % 2;
+      for (let tries = 0; tries < 12 && !clearOf(fx, side); tries++) fx += 3;
+      const look = randomSpectator(rnd, 'm');
+      Object.assign(look, { prop: 'sign', sign: 'THIS GAME IS SILLY' });
+      people.push({ kind: 'fan', x: fx, side, look, t: rnd() * 10, scale: 1.02, silly: true });
     }
     const addCrew = (x, side, cameraFacesLeft, line, look) => {
       const camX = cameraFacesLeft ? x + 5 : x;
@@ -205,7 +215,7 @@
 
     // Far skyline (parallax 0.12): towers, with Melbourne landmarks mixed in.
     const far = [];
-    for (let fx = -20; fx < 260;) {
+    for (let fx = -20; fx < TRACK_LEN * 0.12 + 120;) {
       const w = 5 + rnd() * 8;
       far.push({ type: 'tower', x: fx, w, h: 60 + rnd() * 120, tone: rnd(), crown: rnd() < 0.3 });
       fx += w + 0.5 + rnd() * 3;
