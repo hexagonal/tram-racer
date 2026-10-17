@@ -901,6 +901,7 @@
 
   function startCountdown() {
     initAudio();
+    if (window.TramMusic) window.TramMusic.start(actx); // a fresh tune for every race
     newRace();
     state = 'countdown';
     countdown = 2.999;
@@ -995,6 +996,7 @@
         r.phase = 'drive';
         if (r.isPlayer) {
           sfx.ding();
+          if (window.TramMusic) window.TramMusic.bellRang();
           message = { text: 'DING DING!', sub: 'Hold → for power, ← to brake', t: 1.8 };
         }
       }
@@ -2394,6 +2396,7 @@
     if (GAME_KEYS.has(e.code)) e.preventDefault();
     keys[e.code] = true;
     initAudio();
+    if (!e.repeat && e.code === 'KeyM' && window.TramMusic) window.TramMusic.toggleMute();
     if (!e.repeat && (e.code === 'Enter' || e.code === 'Space') && (state === 'title' || state === 'results')) startCountdown();
   });
   window.addEventListener('keyup', (e) => { keys[e.code] = false; });
