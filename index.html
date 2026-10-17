@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tram Racer</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #15171c;
+      color: #e8e8e8;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      max-width: 960px;
+      height: auto;
+      aspect-ratio: 16 / 9;
+      border-radius: 8px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      background: #000;
+      image-rendering: crisp-edges;
+      image-rendering: pixelated;
+    }
+    p.help {
+      margin: 0;
+      font-size: 14px;
+      color: #9aa0a6;
+      text-align: center;
+    }
+    kbd {
+      background: #2a2d33;
+      border: 1px solid #44484f;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-family: inherit;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game" width="320" height="180"></canvas>
+  <p class="help">
+    Run: tap <kbd>←</kbd> <kbd>→</kbd> in turn &nbsp;·&nbsp;
+    Tram: <kbd>→</kbd> power, <kbd>←</kbd> brake &nbsp;·&nbsp;
+    <kbd>Enter</kbd> start
+  </p>
+  <script src="game.js"></script>
+</body>
+</html>
