@@ -62,11 +62,30 @@
   const pick = (arr, rnd) => arr[Math.floor(rnd() * arr.length)];
 
   // ---- Sound --------------------------------------------------------------
+  // Everything (music and sound effects) goes through one master volume,
+  // remembered between visits.
   let actx = null;
+  let masterGain = null;
+  let volume = 0.8;
+  try {
+    const saved = parseFloat(localStorage.getItem('tramRacer.volume'));
+    if (saved >= 0 && saved <= 1) volume = saved;
+  } catch (e) { /* storage blocked: keep the default */ }
+  const volumeGain = () => volume * volume;
+  function setVolume(v) {
+    volume = clamp(v, 0, 1);
+    if (masterGain) masterGain.gain.setTargetAtTime(volumeGain(), actx.currentTime, 0.03);
+  }
+  function saveVolume() {
+    try { localStorage.setItem('tramRacer.volume', String(volume)); } catch (e) { /* not saved */ }
+  }
   function initAudio() {
     if (!actx) {
       try {
         actx = new (window.AudioContext || window.webkitAudioContext)();
+        masterGain = actx.createGain();
+        masterGain.gain.value = volumeGain();
+        masterGain.connect(actx.destination);
       } catch (e) {
         actx = null;
       }
@@ -84,7 +103,7 @@
     if (slide) o.frequency.exponentialRampToValueAtTime(slide, t0 + dur);
     g.gain.setValueAtTime(vol, t0);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    o.connect(g).connect(actx.destination);
+    o.connect(g).connect(masterGain);
     o.start(t0);
     o.stop(t0 + dur + 0.05);
   }
@@ -99,7 +118,7 @@
     const g = actx.createGain();
     g.gain.value = vol;
     src.buffer = buf;
-    src.connect(g).connect(actx.destination);
+    src.connect(g).connect(masterGain);
     src.start();
   }
 
@@ -158,6 +177,8 @@
     // (with some jitter) along the course on alternating footpaths.
     let fi = 0;
     for (const [fx, side] of [[-12, 0], [-8, 1], [TRACK_LEN - 4, 0], [TRACK_LEN + 9, 0], [TRACK_LEN + 18, 1], [TRACK_LEN + 1, 1]]) addFan(fx, side, fi++);
+    // Someone at the start has an opinion about all this.
+    Object.assign(people.find((p) => p.kind === 'fan' && p.x === -8).look, { prop: 'sign', sign: 'THIS GAME IS SILLY' });
     const spread = fanCount - fi;
     for (let k = 0; k < spread; k++) {
       const side = rnd() < 0.5 ? 0 : 1;
@@ -788,12 +809,18 @@
       ctx.moveTo(front[0], front[1]);
       ctx.lineTo(front[0] - 2, -80);
       ctx.stroke();
-      roundRect(back[0] - 6, -96, front[0] - back[0] + 12, 18, 2);
-      outlineFill('#fffbe6');
+      // Long slogans go on a wider board over two lines, still above the head.
+      const words = look.sign.split(' ');
+      const lines = look.sign.length > 9 ? [words.slice(0, 2).join(' '), words.slice(2).join(' ')] : [look.sign];
       ctx.font = `900 9px ${FONT}`;
+      const mid = (back[0] + front[0]) / 2;
+      const bw = Math.max(front[0] - back[0] + 12, ...lines.map((l) => ctx.measureText(l).width + 8));
+      const bh = lines.length * 10 + 8;
+      roundRect(mid - bw / 2, -78 - bh, bw, bh, 2);
+      outlineFill('#fffbe6');
       ctx.textAlign = 'center';
-      ctx.fillStyle = look.trim === '#f8f9fa' ? '#c92a2a' : look.trim;
-      ctx.fillText(look.sign, (back[0] + front[0]) / 2, -84);
+      ctx.fillStyle = look.trim === '#f8f9fa' || look.trim === '#fffbe6' ? '#c92a2a' : look.trim;
+      lines.forEach((l, i) => ctx.fillText(l, mid, -84 - (lines.length - 1 - i) * 10));
     } else if (look.prop === 'phone') {
       drawPhone(front);
     }
@@ -901,7 +928,7 @@
 
   function startCountdown() {
     initAudio();
-    if (window.TramMusic) window.TramMusic.start(actx); // a fresh tune for every race
+    if (window.TramMusic) window.TramMusic.start(actx, masterGain); // a fresh tune for every race
     newRace();
     state = 'countdown';
     countdown = 2.999;
@@ -2328,6 +2355,90 @@
     lines.forEach((l, i) => label(l.t, W / 2, y + 98 + i * 28, l.size || 17, l.c || '#e9ecef', 'center', l.w || 'bold'));
   }
 
+  // ---- Volume -------------------------------------------------------------
+  // A speaker button in the top-right corner; tap it to slide the volume.
+  const VOL_BTN = [W - 56, 58, 44, 44];
+  const VOL_TRACK = [W - 270, 58, 206, 44];
+  let volOpen = false;
+  let volDrag = null;
+  let volTouched = 0;
+
+  function drawVolume() {
+    if (volOpen && volDrag === null && clock - volTouched > 4) volOpen = false;
+    const [bx, by, bw, bh] = VOL_BTN;
+    fillRR(bx, by, bw, bh, 12, 'rgba(15,20,30,0.72)');
+    const cx = bx + 15;
+    const cy = by + bh / 2;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(cx - 7, cy - 4);
+    ctx.lineTo(cx - 3, cy - 4);
+    ctx.lineTo(cx + 3, cy - 10);
+    ctx.lineTo(cx + 3, cy + 10);
+    ctx.lineTo(cx - 3, cy + 4);
+    ctx.lineTo(cx - 7, cy + 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    if (volume < 0.01) {
+      ctx.beginPath();
+      ctx.moveTo(cx + 8, cy - 5);
+      ctx.lineTo(cx + 18, cy + 5);
+      ctx.moveTo(cx + 18, cy - 5);
+      ctx.lineTo(cx + 8, cy + 5);
+      ctx.stroke();
+    } else {
+      for (let k = 0; k < 3; k++) {
+        if (volume <= k / 3) break;
+        ctx.beginPath();
+        ctx.arc(cx + 3, cy, 7 + k * 5, -0.7, 0.7);
+        ctx.stroke();
+      }
+    }
+    if (!volOpen) return;
+    const [tx, ty, tw, th] = VOL_TRACK;
+    fillRR(tx, ty, tw, th, 12, 'rgba(15,20,30,0.85)');
+    const x0 = tx + 18;
+    const x1 = tx + tw - 18;
+    const kx = x0 + (x1 - x0) * volume;
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = '#495057';
+    ctx.beginPath();
+    ctx.moveTo(x0, cy);
+    ctx.lineTo(x1, cy);
+    ctx.stroke();
+    ctx.strokeStyle = '#ffd43b';
+    ctx.beginPath();
+    ctx.moveTo(x0, cy);
+    ctx.lineTo(kx, cy);
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(kx, cy, 10, 0, Math.PI * 2);
+    ctx.fill();
+    label(`VOLUME ${Math.round(volume * 100)}`, tx + tw / 2, ty + 12, 9, '#adb5bd');
+  }
+
+  function toCanvas(e) {
+    const r = canvas.getBoundingClientRect();
+    return [(e.clientX - r.left) * W / r.width, (e.clientY - r.top) * H / r.height];
+  }
+  const inside = ([x, y], [rx, ry, rw, rh]) => x >= rx && x <= rx + rw && y >= ry && y <= ry + rh;
+  function volumeHit(e) {
+    const p = toCanvas(e);
+    if (inside(p, VOL_BTN)) return 'button';
+    if (volOpen && inside(p, VOL_TRACK)) return 'track';
+    return null;
+  }
+  function slideVolume(e) {
+    const [x] = toCanvas(e);
+    setVolume((x - (VOL_TRACK[0] + 18)) / (VOL_TRACK[2] - 36));
+    volTouched = clock;
+  }
+
   // ---- Frame --------------------------------------------------------------
   function render() {
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -2423,6 +2534,17 @@
     if (isUi(e)) return;
     if (e.cancelable) e.preventDefault();
     initAudio();
+    const hit = volumeHit(e);
+    if (hit) {
+      volTouched = clock;
+      if (hit === 'button') {
+        volOpen = !volOpen;
+      } else {
+        volDrag = e.pointerId;
+        slideVolume(e);
+      }
+      return;
+    }
     if (state === 'title' || (state === 'results' && performance.now() - resultsShownAt > 900)) {
       startCountdown();
       return;
@@ -2433,12 +2555,20 @@
   }, { passive: false });
   // Sliding a finger across the middle switches pedals.
   window.addEventListener('pointermove', (e) => {
+    if (e.pointerId === volDrag) {
+      slideVolume(e);
+      return;
+    }
     if (!pointers.has(e.pointerId)) return;
     pointers.set(e.pointerId, sideOf(e));
     syncTouch();
   });
   for (const ev of ['pointerup', 'pointercancel']) {
     window.addEventListener(ev, (e) => {
+      if (e.pointerId === volDrag) {
+        volDrag = null;
+        saveVolume();
+      }
       pointers.delete(e.pointerId);
       syncTouch();
     });
@@ -2463,6 +2593,7 @@
     last = now;
     update(dt);
     render();
+    drawVolume();
     requestAnimationFrame(frame);
   }
 
