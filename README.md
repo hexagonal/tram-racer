@@ -9,11 +9,11 @@ A silly tram race through Melbourne that runs in a web browser. You (in a green-
 3. On the tram you can only go forwards:
    - **→ / D** (or ↑ / W) powers the tram.
    - **← / A** (or ↓ / S) brakes.
-   - On a touch screen, or with the mouse, hold the **POWER** and **BRAKE** pedals in the corners (or press anywhere on the right or left half).
+   - On an iPhone or iPad (or with the mouse), tap or hold anywhere on the **right half** of the screen for → and the **left half** for ←. The POWER and BRAKE pedals in the corners show what you're pressing. Turn a phone sideways for the biggest view.
 4. Watch out for:
    - **Curves** (yellow chevrons, "40" signs): go over 40 km/h and you derail.
    - **Road crossings**: when the light by your track is red, a car is about to cross. Stop, or hit it.
-5. Cheerleaders and their crowds of fans cheer you on along the way, and TV news crews cover the start and the finish. First tram past the finish wins.
+5. Cheerleaders and a mix of male and female spectators, spread out along the route, cheer you on, and TV news crews cover the start and the finish. First tram past the finish wins.
 
 ## Running it
 
