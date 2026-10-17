@@ -139,19 +139,32 @@
       x += 140 + rnd() * 110;
     }
 
-    // Cheerleaders turn up now and then along the footpaths, each with three
-    // spectators around them, plus TV news crews at the start and finish.
+    // Cheerleaders turn up now and then along the footpaths. Spectators (three
+    // for every cheerleader, a mix of men and women) are spread out along the
+    // whole route instead of clumping around them. TV news crews cover the
+    // start and the finish.
     const people = [];
     const vans = [];
-    const addCheer = (x, side, look) => {
-      people.push({ kind: 'cheer', x, side, look, t: rnd() * 10, said: false });
-      for (const off of [-6.5, -3.2, 3.6]) {
-        people.push({ kind: 'fan', x: x + off + (rnd() - 0.5), side, look: randomSpectator(rnd), t: rnd() * 10, scale: 0.92 + rnd() * 0.14 });
-      }
+    const cheers = [];
+    for (let cx = 120 + rnd() * 80; cx < TRACK_LEN - 60; cx += 160 + rnd() * 180) cheers.push([cx, rnd() < 0.5 ? 0 : 1, pick(CHEER_LOOKS, rnd)]);
+    cheers.push([TRACK_LEN + 6, 1, CHEER_LOOKS[0]], [TRACK_LEN + 14, 1, CHEER_LOOKS[1]]);
+    for (const [cx, side, look] of cheers) people.push({ kind: 'cheer', x: cx, side, look, t: rnd() * 10, said: false });
+    const fanCount = cheers.length * 3;
+    const clearOf = (fx, side) => people.every((p) => p.side !== side || Math.abs(p.x - fx) > 2.6);
+    const addFan = (fx, side, i) => {
+      people.push({ kind: 'fan', x: fx, side, look: randomSpectator(rnd, i % 2 ? 'm' : 'f'), t: rnd() * 10, scale: 0.92 + rnd() * 0.14 });
     };
-    for (let cx = 120 + rnd() * 80; cx < TRACK_LEN - 60; cx += 160 + rnd() * 180) addCheer(cx, rnd() < 0.5 ? 0 : 1, pick(CHEER_LOOKS, rnd));
-    addCheer(TRACK_LEN + 6, 1, CHEER_LOOKS[0]);
-    addCheer(TRACK_LEN + 14, 1, CHEER_LOOKS[1]);
+    // A small crowd at the start and the finish, the rest spread evenly
+    // (with some jitter) along the course on alternating footpaths.
+    let fi = 0;
+    for (const [fx, side] of [[-12, 0], [-8, 1], [TRACK_LEN - 4, 0], [TRACK_LEN + 9, 0], [TRACK_LEN + 18, 1], [TRACK_LEN + 1, 1]]) addFan(fx, side, fi++);
+    const spread = fanCount - fi;
+    for (let k = 0; k < spread; k++) {
+      const side = rnd() < 0.5 ? 0 : 1;
+      let fx = 60 + (k + 0.5) * ((TRACK_LEN - 80) / spread) + (rnd() - 0.5) * 30;
+      for (let tries = 0; tries < 8 && !clearOf(fx, side); tries++) fx += 3;
+      addFan(fx, side, fi++);
+    }
     const addCrew = (x, side, cameraFacesLeft, line, look) => {
       const camX = cameraFacesLeft ? x + 5 : x;
       const repX = cameraFacesLeft ? x : x + 5;
@@ -213,57 +226,104 @@
   }
 
   // ---- Characters ---------------------------------------------------------
-  const PLAYER_LOOK = { skin: '#ffe0c7', hair: '#2d6cdf', hairDark: '#1d4aa0', style: 'spiky', eye: '#1d4aa0', outfit: '#23395b', trim: '#f4c430', cap: '#1b2a44', legs: '#1b2a44', shoes: '#111' };
-  const CPU_LOOK = { skin: '#f7d2b6', hair: '#e2e6ee', hairDark: '#a9b0bf', style: 'pony', eye: '#2e9e5b', outfit: '#3f4a52', trim: '#78be20', cap: null, legs: '#2b3036', shoes: '#111' };
+  const PLAYER_LOOK = { gender: 'm', skin: '#ffe0c7', hair: '#2d6cdf', hairDark: '#1a3f8f', style: 'spiky', eye: '#1d5fd0', outfit: '#23395b', trim: '#f4c430', cap: '#1b2a44', legs: '#1b2a44', shoes: '#111' };
+  const CPU_LOOK = { gender: 'f', skin: '#f7d2b6', hair: '#e2e6ee', hairDark: '#9aa2b4', style: 'pony', eye: '#2e9e5b', outfit: '#3f4a52', trim: '#78be20', cap: null, legs: '#2b3036', shoes: '#111' };
   const CHEER_LOOKS = [
-    { skin: '#ffe3cf', hair: '#ff6fa8', hairDark: '#d94a86', style: 'twin', eye: '#b0306a', outfit: '#ffffff', trim: '#1f4fa3', skirt: '#1f4fa3', legs: '#ffe3cf', pom: '#f4c430', shoes: '#fff' },
-    { skin: '#f3c9a5', hair: '#f6c544', hairDark: '#c99a22', style: 'twin', eye: '#6b3fa0', outfit: '#ffffff', trim: '#c0392b', skirt: '#c0392b', legs: '#f3c9a5', pom: '#ffffff', shoes: '#fff' },
-    { skin: '#d9a07a', hair: '#3a2a2a', hairDark: '#1e1414', style: 'pony', eye: '#5a3a1a', outfit: '#ffffff', trim: '#16a085', skirt: '#16a085', legs: '#d9a07a', pom: '#f39c12', shoes: '#fff' },
+    { gender: 'f', skin: '#ffe3cf', hair: '#ff6fa8', hairDark: '#c93f7a', style: 'twin', eye: '#c2306f', outfit: '#ffffff', trim: '#1f4fa3', skirt: '#1f4fa3', legs: '#ffe3cf', pom: '#f4c430', shoes: '#fff' },
+    { gender: 'f', skin: '#f3c9a5', hair: '#f6c544', hairDark: '#c08d1c', style: 'twin', eye: '#7b45b8', outfit: '#ffffff', trim: '#c0392b', skirt: '#c0392b', legs: '#f3c9a5', pom: '#ffffff', shoes: '#fff' },
+    { gender: 'f', skin: '#d9a07a', hair: '#3a2a2a', hairDark: '#1a1010', style: 'pony', eye: '#8a5a2a', outfit: '#ffffff', trim: '#16a085', skirt: '#16a085', legs: '#d9a07a', pom: '#f39c12', shoes: '#fff' },
   ];
   const REPORTER_LOOKS = [
-    { skin: '#ffe0c7', hair: '#6b3a1f', hairDark: '#4a2612', style: 'bob', eye: '#6b3a1f', outfit: '#b5223a', trim: '#f3e6e6', legs: '#2a2a33', shoes: '#111' },
-    { skin: '#e8b996', hair: '#1c1c24', hairDark: '#0d0d12', style: 'short', eye: '#3a3a5a', outfit: '#2f3e5c', trim: '#dfe6ee', legs: '#2a2a33', shoes: '#111' },
+    { gender: 'f', skin: '#ffe0c7', hair: '#6b3a1f', hairDark: '#3f2010', style: 'bob', eye: '#8a4a22', outfit: '#b5223a', trim: '#f3e6e6', legs: '#2a2a33', shoes: '#111', skirt: '#2a2a33' },
+    { gender: 'm', skin: '#e8b996', hair: '#1c1c24', hairDark: '#08080c', style: 'short', eye: '#3a3a6a', outfit: '#2f3e5c', trim: '#dfe6ee', legs: '#2a2a33', shoes: '#111' },
   ];
-  const CAMERA_LOOK = { skin: '#f0c8a8', hair: '#5a4a3a', hairDark: '#3a2e24', style: 'short', eye: '#3a2e24', outfit: '#4b5a3c', trim: '#2b3324', legs: '#3a3f46', shoes: '#222', cap: '#22262b' };
+  const CAMERA_LOOK = { gender: 'm', skin: '#f0c8a8', hair: '#5a4a3a', hairDark: '#2e241a', style: 'messy', eye: '#4a3a2a', outfit: '#4b5a3c', trim: '#2b3324', legs: '#3a3f46', shoes: '#222', cap: '#22262b' };
   const SKINS = ['#ffe3cf', '#f7d2b6', '#f0c8a8', '#e3b08c', '#c98d66', '#9a6646', '#ffd9c2'];
-  const HAIRS = [['#2d2a32', '#17151a'], ['#7a4a2a', '#563218'], ['#e8c34a', '#b8942a'], ['#c0392b', '#8e2a20'], ['#7d5fd3', '#5a41a8'], ['#e2e6ee', '#a9b0bf'], ['#3fae8f', '#2b7c66'], ['#f08bb4', '#c86190']];
-  const STYLES = ['short', 'spiky', 'bob', 'long', 'pony', 'bun'];
-  const OUTFITS = ['#e8590c', '#1971c2', '#2f9e44', '#f8f9fa', '#ae3ec9', '#f59f00', '#c92a2a', '#495057', '#0ca678'];
+  const HAIRS = [['#2d2a32', '#100e14'], ['#7a4a2a', '#4a2a12'], ['#e8c34a', '#b0861c'], ['#c0392b', '#7a1f16'], ['#7d5fd3', '#4a3394'], ['#e2e6ee', '#9aa2b4'], ['#3fae8f', '#1f7058'], ['#f08bb4', '#b8507e'], ['#4a6fd0', '#24408f']];
+  const OUTFITS = ['#e8590c', '#1971c2', '#2f9e44', '#f8f9fa', '#ae3ec9', '#f59f00', '#c92a2a', '#495057', '#0ca678', '#f783ac'];
+  const EYES = ['#1d5fd0', '#2e9e5b', '#8a4a22', '#7b45b8', '#c2306f', '#d08a1d', '#3a7a9a'];
   const PROPS = ['flag', 'scarf', 'phone', 'sign', 'none', 'flag', 'scarf'];
   const OUTLINE = '#2b1d1d';
 
-  function randomSpectator(rnd) {
+  function randomSpectator(rnd, gender) {
     const [hair, hairDark] = pick(HAIRS, rnd);
+    const female = gender === 'f';
     return {
-      skin: pick(SKINS, rnd), hair, hairDark, style: pick(STYLES, rnd), eye: hairDark,
-      outfit: pick(OUTFITS, rnd), trim: pick(OUTFITS, rnd), legs: pick(['#2b3a55', '#3a3a3a', '#5c4a3a', '#1f2a44', '#6b7b8c'], rnd),
-      shoes: pick(['#111', '#f8f9fa', '#7a3f1d'], rnd), prop: pick(PROPS, rnd), flag: pick([['#1f5a36', '#f4c430'], ['#0b2a6b', '#ffffff'], ['#c92a2a', '#ffffff'], ['#78be20', '#ffffff']], rnd),
+      gender, skin: pick(SKINS, rnd), hair, hairDark,
+      style: pick(female ? ['long', 'pony', 'bob', 'bun', 'twin', 'long'] : ['short', 'spiky', 'messy', 'short'], rnd),
+      eye: pick(EYES, rnd), outfit: pick(OUTFITS, rnd), trim: pick(OUTFITS, rnd),
+      legs: pick(['#2b3a55', '#3a3a3a', '#5c4a3a', '#1f2a44', '#6b7b8c'], rnd),
+      skirt: female && rnd() < 0.5 ? pick(['#1f2a44', '#c92a2a', '#495057', '#7048e8', '#e8590c'], rnd) : null,
+      shoes: pick(['#111', '#f8f9fa', '#7a3f1d'], rnd), prop: pick(PROPS, rnd),
+      flag: pick([['#1f5a36', '#f4c430'], ['#0b2a6b', '#ffffff'], ['#c92a2a', '#ffffff'], ['#78be20', '#ffffff']], rnd),
       sign: pick(['GO W!', 'GO G!', 'DING!', 'GO GO!', 'MELB ♥'], rnd),
     };
   }
 
-  // A limb with a dark anime-style outline. Returns the end point.
-  function limb(x1, y1, len, ang, width, color) {
-    const x2 = x1 + Math.sin(ang) * len;
-    const y2 = y1 + Math.cos(ang) * len;
-    ctx.lineCap = 'round';
-    for (const [c, w] of [[OUTLINE, width + 2.2], [color, width]]) {
-      ctx.strokeStyle = c;
-      ctx.lineWidth = w;
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
-    }
-    return [x2, y2];
-  }
-
-  function outlineFill(color) {
+  function outlineFill(color, width = 1.1) {
     ctx.fillStyle = color;
     ctx.fill();
     ctx.strokeStyle = OUTLINE;
-    ctx.lineWidth = 1.1;
+    ctx.lineWidth = width;
+    ctx.lineJoin = 'round';
     ctx.stroke();
+  }
+
+  // A tapered limb segment with an outline. Returns the end point.
+  function limb(x1, y1, len, ang, width, color, endWidth = width) {
+    const x2 = x1 + Math.sin(ang) * len;
+    const y2 = y1 + Math.cos(ang) * len;
+    const nx = Math.cos(ang);
+    const ny = -Math.sin(ang);
+    ctx.beginPath();
+    ctx.moveTo(x1 + nx * width / 2, y1 + ny * width / 2);
+    ctx.lineTo(x2 + nx * endWidth / 2, y2 + ny * endWidth / 2);
+    ctx.arc(x2, y2, endWidth / 2, ang === 0 ? 0 : Math.atan2(ny, nx), Math.atan2(ny, nx) + Math.PI, true);
+    ctx.lineTo(x1 - nx * width / 2, y1 - ny * width / 2);
+    ctx.arc(x1, y1, width / 2, Math.atan2(-ny, -nx), Math.atan2(-ny, -nx) + Math.PI, true);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+    // Cover the previous segment's end outline where the joint bends.
+    ctx.beginPath();
+    ctx.arc(x1, y1, width / 2 + 0.55, 0, Math.PI * 2);
+    ctx.fill();
+    // Outline the sides and the far end only, so elbows and knees don't
+    // show up as rings.
+    ctx.beginPath();
+    ctx.moveTo(x1 + nx * width / 2, y1 + ny * width / 2);
+    ctx.lineTo(x2 + nx * endWidth / 2, y2 + ny * endWidth / 2);
+    ctx.arc(x2, y2, endWidth / 2, ang === 0 ? 0 : Math.atan2(ny, nx), Math.atan2(ny, nx) + Math.PI, true);
+    ctx.lineTo(x1 - nx * width / 2, y1 - ny * width / 2);
+    ctx.strokeStyle = OUTLINE;
+    ctx.lineWidth = 1;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+    return [x2, y2];
+  }
+
+  // Shoulder to hand: sleeve, forearm and a small hand. Returns the hand.
+  function arm(look, sx0, ang, bend, len = 15) {
+    const elbow = limb(sx0, -35, len * 0.5, ang, 4.6, look.outfit, 4);
+    const handPt = limb(elbow[0], elbow[1], len * 0.5, ang + bend, 3.6, look.skin, 3.2);
+    ctx.beginPath();
+    ctx.arc(handPt[0], handPt[1], 2.4, 0, Math.PI * 2);
+    outlineFill(look.skin, 0.9);
+    if (look.pom) {
+      ctx.beginPath();
+      for (let i = 0; i < 9; i++) {
+        const a2 = (i / 9) * Math.PI * 2;
+        const r2 = i % 2 ? 4.5 : 6.2;
+        ctx.lineTo(handPt[0] + Math.cos(a2) * r2, handPt[1] + Math.sin(a2) * r2);
+      }
+      ctx.closePath();
+      outlineFill(look.pom, 0.9);
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.beginPath();
+      ctx.arc(handPt[0] - 1.5, handPt[1] - 1.8, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return handPt;
   }
 
   // Anime-style character, facing right (or left with a.flip), feet at (x, y).
@@ -271,277 +331,431 @@
     const s = a.scale || 1;
     const phase = a.phase || 0;
     const moving = !!a.moving;
+    const female = look.gender === 'f';
     ctx.save();
     ctx.translate(x, y - (a.jump || 0));
     ctx.scale(a.flip ? -s : s, s);
 
-    // Shadow
+    // Ground shadow
     ctx.fillStyle = 'rgba(0,0,0,0.22)';
     ctx.beginPath();
     ctx.ellipse(0, 1 + (a.jump || 0) / s, 11, 3, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Legs and shoes
-    const swing = moving ? Math.sin(phase) * 0.9 : 0;
-    const hipY = -22;
-    const legs = [[-2, swing, Math.max(0, Math.sin(phase))], [2, -swing, Math.max(0, -Math.sin(phase))]];
-    for (const [hx, sw, bend] of legs) {
-      const knee = limb(hx, hipY, 11, sw, 5, look.legs);
-      const foot = limb(knee[0], knee[1], 11, sw - (moving ? bend * 0.9 : 0), 5, look.legs);
-      ctx.beginPath();
-      ctx.ellipse(foot[0] + 2, foot[1] + 1, 4, 2.4, 0, 0, Math.PI * 2);
-      outlineFill(look.shoes || '#222');
-    }
-
-    // Arms. When cheering they go up and out in a wide V, drawn behind the
-    // head so they never cover the face.
-    const hand = (pt, pomR) => {
-      if (look.pom) {
-        ctx.beginPath();
-        ctx.arc(pt[0], pt[1], pomR, 0, Math.PI * 2);
-        outlineFill(look.pom);
-        ctx.fillStyle = 'rgba(255,255,255,0.45)';
-        ctx.beginPath();
-        ctx.arc(pt[0] - 1.5, pt[1] - 1.5, pomR * 0.4, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    };
+    const sw = female ? 6.5 : 8;           // half shoulder width
+    const armSwing = moving ? -Math.sin(phase) * 1.1 : 0.12;
     const wave = Math.sin(phase * 2) * 0.15;
-    const armSwing = moving ? -Math.sin(phase) * 1.1 : 0.15;
+
+    // Back arm first, so the body overlaps it
+    let backHand = null;
     let frontHand = null;
     if (a.armsUp) {
-      const back = limb(-2, -36, 15, -(Math.PI - 1.2) - wave, 4, look.skin);
-      frontHand = limb(3, -36, 15, Math.PI - 1.2 + wave, 4, look.skin);
-      hand(back, 5.5);
-      hand(frontHand, 5.5);
-      drawHeldProp(look, back, frontHand, phase, true);
+      backHand = arm(look, -sw + 2, -(Math.PI - 1.15) - wave, -0.25, 17);
+      frontHand = arm(look, sw - 2, Math.PI - 1.15 + wave, 0.25, 17);
+      drawHeldProp(look, backHand, frontHand, phase, true);
     } else {
-      hand(limb(-2, -36, 13, -armSwing, 4, look.skin), 5);
+      arm(look, -sw + 2.5, -armSwing, moving ? 0.6 : 0.15);
     }
 
-    // Body
-    roundRect(-7, -40, 14, 19, 5);
-    outlineFill(look.outfit);
-    ctx.fillStyle = 'rgba(0,0,0,0.12)';
-    ctx.fillRect(-7, -32, 5, 10);
-    ctx.fillStyle = look.trim;
-    ctx.fillRect(-6.5, -27, 13, 2);
-    if (look.skirt) {
+    // Legs: thighs and shins, with a knee bend when running
+    const swing = moving ? Math.sin(phase) * 0.85 : 0;
+    const trousers = female && (look.skirt || look.style === 'twin') ? look.legs : look.legs;
+    for (const [hx, sw2, bend] of [[-2.2, swing, Math.max(0, Math.sin(phase))], [2.2, -swing, Math.max(0, -Math.sin(phase))]]) {
+      const knee = limb(hx, -22, 11, sw2, 5.4, trousers, 4.4);
+      const foot = limb(knee[0], knee[1], 10.5, sw2 - (moving ? bend * 1.0 : 0), 4.4, trousers, 3.6);
       ctx.beginPath();
-      ctx.moveTo(-7, -24);
-      ctx.lineTo(7, -24);
-      ctx.lineTo(10 + Math.sin(phase * 2) * 1.5, -15);
-      ctx.lineTo(-10 + Math.sin(phase * 2) * 1.5, -15);
+      ctx.moveTo(foot[0] - 2.5, foot[1] - 1);
+      ctx.quadraticCurveTo(foot[0] + 6.5, foot[1] - 2.5, foot[0] + 6, foot[1] + 1.5);
+      ctx.lineTo(foot[0] - 2.5, foot[1] + 1.5);
+      ctx.closePath();
+      outlineFill(look.shoes || '#222', 0.9);
+    }
+
+    // Torso with shoulders and waist
+    ctx.beginPath();
+    ctx.moveTo(-sw, -33);
+    ctx.quadraticCurveTo(-sw, -38, -sw + 4, -38);
+    ctx.lineTo(sw - 4, -38);
+    ctx.quadraticCurveTo(sw, -38, sw, -33);
+    ctx.lineTo(female ? 5 : 6.5, -27);
+    ctx.lineTo(female ? 6.5 : 6.5, -21);
+    ctx.lineTo(female ? -6.5 : -6.5, -21);
+    ctx.lineTo(female ? -5 : -6.5, -27);
+    ctx.closePath();
+    ctx.save();
+    outlineFill(look.outfit);
+    ctx.clip();
+    ctx.fillStyle = 'rgba(0,0,0,0.16)';
+    ctx.fillRect(-sw - 1, -38, 4.5, 18);
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    ctx.fillRect(sw - 3.5, -37, 2.5, 10);
+    ctx.fillStyle = look.trim;
+    ctx.fillRect(-sw, -24.5, sw * 2, 2);
+    // Collar
+    ctx.fillStyle = look.outfit === '#ffffff' || look.outfit === '#f8f9fa' ? look.trim : '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(-2.5, -38);
+    ctx.lineTo(1, -33.5);
+    ctx.lineTo(4.5, -38);
+    ctx.fill();
+    ctx.restore();
+    if (look.skirt) {
+      const flick = Math.sin(phase * 2) * 1.2;
+      ctx.beginPath();
+      ctx.moveTo(-6.5, -22.5);
+      ctx.lineTo(6.5, -22.5);
+      ctx.lineTo(10 + flick, -13);
+      ctx.lineTo(-10 + flick, -13);
       ctx.closePath();
       outlineFill(look.skirt);
-    }
-    if (look.prop === 'scarf') {
-      const [c1, c2] = look.flag;
-      for (let i = 0; i < 4; i++) {
-        ctx.fillStyle = i % 2 ? c2 : c1;
-        ctx.fillRect(-7 + i * 3.5, -41, 3.5, 4);
+      ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      for (const px of [-4, 0, 4]) {
+        ctx.moveTo(px, -22);
+        ctx.lineTo(px * 1.5 + flick, -13.5);
       }
-      ctx.fillStyle = c1;
-      ctx.fillRect(-9, -38, 3, 10);
+      ctx.stroke();
+    }
+    if (look.prop === 'scarf' && look.flag) {
+      const [c1, c2] = look.flag;
+      ctx.beginPath();
+      ctx.ellipse(1, -38, 6.5, 2.6, 0, 0, Math.PI * 2);
+      outlineFill(c1, 0.9);
+      ctx.fillStyle = c2;
+      ctx.fillRect(-2, -40, 2.5, 4);
+      ctx.fillRect(3, -40, 2.5, 4);
+      ctx.beginPath();
+      ctx.rect(-6, -37, 3, 10);
+      outlineFill(c1, 0.9);
+      ctx.fillStyle = c2;
+      ctx.fillRect(-6, -32, 3, 2);
     }
 
-    // Hair that sits behind the head
-    drawBackHair(look, phase, moving);
-
-    // Head
+    // Neck
     ctx.beginPath();
-    ctx.arc(1, -52, 12.5, 0, Math.PI * 2);
+    ctx.rect(-1.5, -42, 5, 5);
+    outlineFill(look.skin, 0.9);
+    ctx.fillStyle = 'rgba(120,60,50,0.25)';
+    ctx.fillRect(-1, -42, 4, 2);
+
+    drawBackHair(look, phase, moving);
+    drawHead(look, a, female);
+
+    // Front arm, always kept below the face
+    if (!a.armsUp) {
+      let ang = armSwing;
+      let bend = moving ? 0.7 : 0.1;
+      if (a.pose === 'mic') { ang = 1.6; bend = 0.9; }
+      if (a.pose === 'camera') { ang = 1.9; bend = 0.4; }
+      if (a.pose === 'phone') { ang = 1.6; bend = 0.6; }
+      frontHand = arm(look, sw - 2.5, ang, bend);
+      if (a.pose === 'mic') drawMic(frontHand);
+      if (a.pose === 'camera') drawCamera(phase);
+      if (a.pose === 'phone' || (look.prop === 'phone' && !moving && !a.pose)) drawPhone(frontHand);
+    }
+    ctx.restore();
+  }
+
+  function headPath() {
+    ctx.beginPath();
+    ctx.moveTo(-12, -56);
+    ctx.arc(1, -56, 13, Math.PI, 0);
+    ctx.quadraticCurveTo(14.6, -47.5, 9.5, -42.2);
+    ctx.quadraticCurveTo(5.5, -39.6, 1, -41.6);
+    ctx.quadraticCurveTo(-11.5, -46, -12, -56);
+    ctx.closePath();
+  }
+
+  function drawHead(look, a, female) {
+    headPath();
+    ctx.save();
     outlineFill(look.skin);
+    ctx.clip();
+    // Soft shade on the far side and under the fringe
+    ctx.fillStyle = 'rgba(200,110,90,0.16)';
+    ctx.fillRect(-13, -70, 6, 30);
+    ctx.fillStyle = 'rgba(200,110,90,0.18)';
+    ctx.fillRect(-13, -58, 30, 3);
+    ctx.restore();
     // Ear
     ctx.beginPath();
-    ctx.ellipse(-6, -50, 2.2, 3, 0, 0, Math.PI * 2);
-    outlineFill(look.skin);
+    ctx.ellipse(-7, -50, 2.4, 3.4, 0.1, 0, Math.PI * 2);
+    outlineFill(look.skin, 0.9);
+    ctx.strokeStyle = 'rgba(160,80,70,0.5)';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.arc(-7, -50, 1.2, -1, 1.6);
+    ctx.stroke();
+
+    // Eyes: the near one larger, the far one narrower (three-quarter view)
+    const eh = female ? 7 : 5.6;
+    drawEye(7.6, -50.5, female ? 3.7 : 3.4, eh, look, female, a.blink, 1);
+    drawEye(-1.4, -50.5, female ? 3.0 : 2.7, eh * 0.95, look, female, a.blink, -1);
+
+    // Brows
+    ctx.strokeStyle = look.hairDark;
+    ctx.lineCap = 'round';
+    ctx.lineWidth = female ? 1 : 1.6;
+    ctx.beginPath();
+    ctx.moveTo(4.5, -57.6);
+    ctx.quadraticCurveTo(7.5, -59, 11, -57.8);
+    ctx.moveTo(-3.6, -57.6);
+    ctx.quadraticCurveTo(-1.5, -58.6, 0.6, -57.8);
+    ctx.stroke();
+
+    // Nose and mouth
+    ctx.strokeStyle = 'rgba(150,70,60,0.7)';
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(12, -48.5);
+    ctx.lineTo(12.8, -46.4);
+    ctx.lineTo(11.6, -46.2);
+    ctx.stroke();
+    const open = a.shout || (a.talk && Math.sin((a.phase || 0) * 7) > 0);
+    if (open) {
+      ctx.beginPath();
+      ctx.moveTo(5, -44);
+      ctx.quadraticCurveTo(7.5, -44.6, 10, -44);
+      ctx.quadraticCurveTo(7.5, -39.8, 5, -44);
+      outlineFill('#9a2e3a', 0.8);
+      ctx.fillStyle = '#ff8fa3';
+      ctx.beginPath();
+      ctx.ellipse(7.5, -41.9, 1.6, 0.8, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = '#8a3a3a';
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(5, -43.8);
+      ctx.quadraticCurveTo(6.9, -42.6, 8.7, -43.9);
+      ctx.stroke();
+    }
+    // Blush
+    for (const [bx, br] of [[10.6, 2.6], [-2.4, 1.9]]) {
+      const bg = ctx.createRadialGradient(bx, -46.6, 0, bx, -46.6, br);
+      bg.addColorStop(0, female ? 'rgba(255,105,135,0.5)' : 'rgba(255,120,120,0.28)');
+      bg.addColorStop(1, 'rgba(255,120,140,0)');
+      ctx.fillStyle = bg;
+      ctx.beginPath();
+      ctx.ellipse(bx, -46.6, br, br * 0.55, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     drawFrontHair(look);
 
     // Driver's or camera operator's cap
     if (look.cap) {
       ctx.beginPath();
-      ctx.ellipse(1, -63, 12, 5.5, 0, Math.PI, 0);
+      ctx.moveTo(-12, -60);
+      ctx.quadraticCurveTo(-11, -72, 2, -72.5);
+      ctx.quadraticCurveTo(14, -72, 14.5, -61);
       ctx.closePath();
       outlineFill(look.cap);
-      ctx.fillStyle = look.cap;
-      ctx.fillRect(-11, -64, 24, 4);
       ctx.beginPath();
-      ctx.rect(6, -61.5, 11, 2.5);
+      ctx.moveTo(8, -61.5);
+      ctx.quadraticCurveTo(16, -62.5, 20, -59.5);
+      ctx.lineTo(9, -59);
+      ctx.closePath();
       outlineFill(look.cap);
       ctx.fillStyle = look.trim;
-      ctx.fillRect(-1, -67, 4, 3);
-    }
-
-    // Big anime eyes (three-quarter view)
-    const blink = a.blink ? 0.15 : 1;
-    for (const [ex, ew] of [[7, 3.4], [-1, 3]]) {
-      ctx.save();
-      ctx.translate(ex, -50);
-      ctx.scale(1, blink);
-      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(-12, -62, 26.5, 1.8);
       ctx.beginPath();
-      ctx.ellipse(0, 0, ew + 0.6, 5, 0, 0, Math.PI * 2);
+      ctx.arc(3, -66.5, 2, 0, Math.PI * 2);
       ctx.fill();
-      const iris = ctx.createLinearGradient(0, -4.4, 0, 4.4);
-      iris.addColorStop(0, '#111');
-      iris.addColorStop(0.35, look.eye);
-      iris.addColorStop(1, '#ffffff');
-      ctx.fillStyle = iris;
-      ctx.beginPath();
-      ctx.ellipse(0.6, 0.5, ew, 4.4, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#111';
-      ctx.beginPath();
-      ctx.ellipse(0.8, 1, ew * 0.45, 2.2, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(1.6, -1.5, 1.4, 0, Math.PI * 2);
-      ctx.arc(-0.6, 2.4, 0.6, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-      // Upper lash line
-      ctx.strokeStyle = '#1a1010';
-      ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      ctx.moveTo(ex - ew - 0.8, -54.6);
-      ctx.quadraticCurveTo(ex, -56.2, ex + ew + 1, -55);
-      ctx.stroke();
-      // Brow
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = look.hairDark;
-      ctx.beginPath();
-      ctx.moveTo(ex - ew, -58.5);
-      ctx.lineTo(ex + ew, -59);
-      ctx.stroke();
-    }
-    // Nose, blush and mouth
-    ctx.strokeStyle = 'rgba(120,60,50,0.6)';
-    ctx.lineWidth = 0.9;
-    ctx.beginPath();
-    ctx.moveTo(11.5, -48);
-    ctx.lineTo(12.2, -46);
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(255,120,140,0.45)';
-    ctx.beginPath();
-    ctx.ellipse(9.5, -44.5, 2.6, 1.3, 0, 0, Math.PI * 2);
-    ctx.ellipse(-2, -44.5, 2, 1.1, 0, 0, Math.PI * 2);
-    ctx.fill();
-    const open = a.shout || (a.talk && Math.sin(phase * 7) > 0);
-    if (open) {
-      ctx.beginPath();
-      ctx.ellipse(6, -42, 2, 2, 0, 0, Math.PI * 2);
-      ctx.fillStyle = '#7a2a2a';
-      ctx.fill();
-    } else {
-      ctx.strokeStyle = '#7a3030';
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
       ctx.lineWidth = 1.2;
       ctx.beginPath();
-      ctx.arc(6, -43, 2, 0.2, Math.PI - 0.2);
+      ctx.arc(1, -64, 9, -2.6, -1.7);
       ctx.stroke();
     }
+  }
 
-    // Front arm, held below the face
-    if (!a.armsUp) {
-      let ang = armSwing;
-      let len = 13;
-      if (a.pose === 'mic') { ang = 1.75; len = 10; }
-      if (a.pose === 'camera') { ang = 1.5; len = 11; }
-      if (a.pose === 'phone') { ang = 2.1; len = 11; }
-      frontHand = limb(3, -36, len, ang, 4, look.skin);
-      ctx.strokeStyle = look.outfit;
-      ctx.lineWidth = 5;
+  function drawEye(ex, ey, w, h, look, female, blink, side) {
+    if (blink) {
+      ctx.strokeStyle = '#1a1010';
+      ctx.lineWidth = 1.4;
       ctx.beginPath();
-      ctx.moveTo(3, -36);
-      ctx.lineTo(3 + Math.sin(ang) * 4, -36 + Math.cos(ang) * 4);
+      ctx.moveTo(ex - w, ey);
+      ctx.quadraticCurveTo(ex, ey + 1.6, ex + w, ey);
       ctx.stroke();
-      hand(frontHand, 5.5);
-      if (a.pose === 'mic') drawMic(frontHand);
-      if (a.pose === 'camera') drawCamera(phase);
-      if (a.pose === 'phone' || (look.prop === 'phone' && !moving)) drawPhone(frontHand);
+      return;
     }
+    // Sclera
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(ex - w - 0.4, ey - h * 0.3);
+    ctx.quadraticCurveTo(ex, ey - h * 0.62, ex + w + 0.6, ey - h * 0.42);
+    ctx.quadraticCurveTo(ex + w + 0.8, ey + h * 0.45, ex, ey + h * 0.5);
+    ctx.quadraticCurveTo(ex - w - 0.6, ey + h * 0.42, ex - w - 0.4, ey - h * 0.3);
+    ctx.closePath();
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.clip();
+    // Iris with a dark top fading to a bright bottom
+    const ix = ex + 0.5;
+    const g = ctx.createLinearGradient(0, ey - h / 2, 0, ey + h / 2);
+    g.addColorStop(0, '#1c1428');
+    g.addColorStop(0.3, look.eye);
+    g.addColorStop(0.75, look.eye);
+    g.addColorStop(1, '#f2f6ff');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(ix, ey + 0.4, w * 0.88, h * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#0d0a10';
+    ctx.beginPath();
+    ctx.ellipse(ix + 0.2, ey + 0.4, w * 0.4, h * 0.27, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Shadow from the upper lid
+    ctx.fillStyle = 'rgba(40,20,60,0.3)';
+    ctx.fillRect(ex - w - 1, ey - h * 0.62, w * 2 + 2, h * 0.14);
     ctx.restore();
+    // Highlights
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.ellipse(ix + w * 0.35, ey - h * 0.18, w * 0.32, h * 0.13, 0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(ix - w * 0.4, ey + h * 0.24, w * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+    // Upper lash line, heavier on girls with a flick at the outer corner
+    ctx.strokeStyle = '#1a1010';
+    ctx.lineCap = 'round';
+    ctx.lineWidth = female ? 2 : 1.5;
+    ctx.beginPath();
+    ctx.moveTo(ex - w - 0.6, ey - h * 0.28);
+    ctx.quadraticCurveTo(ex, ey - h * 0.68, ex + w + 0.8, ey - h * 0.44);
+    if (female) ctx.lineTo(ex + w + 2.2 * (side > 0 ? 1 : 0.6), ey - h * 0.6);
+    ctx.stroke();
+    // Lower lash
+    ctx.lineWidth = 0.7;
+    ctx.strokeStyle = 'rgba(40,20,20,0.6)';
+    ctx.beginPath();
+    ctx.moveTo(ex - w * 0.4, ey + h * 0.5);
+    ctx.lineTo(ex + w * 0.6, ey + h * 0.46);
+    ctx.stroke();
   }
 
   function drawBackHair(look, phase, moving) {
-    ctx.fillStyle = look.hairDark;
-    ctx.strokeStyle = OUTLINE;
-    ctx.lineWidth = 1.1;
     const flow = moving ? Math.sin(phase * 2) * 3 : 0;
     ctx.beginPath();
     if (look.style === 'pony') {
-      ctx.moveTo(-8, -58);
-      ctx.quadraticCurveTo(-22, -52 + flow, -18, -36 + flow);
-      ctx.quadraticCurveTo(-12, -46, -6, -50);
+      ctx.moveTo(-8, -64);
+      ctx.quadraticCurveTo(-26, -58 + flow, -21, -36 + flow);
+      ctx.quadraticCurveTo(-18, -44, -15, -40 + flow);
+      ctx.quadraticCurveTo(-16, -52, -7, -56);
     } else if (look.style === 'twin') {
       for (const side of [-1, 1]) {
-        const bob = Math.sin(phase * 2 + side) * 3;
-        ctx.moveTo(side * 13 - 2 + 5, -48 + bob);
-        ctx.ellipse(side * 13 - 2, -48 + bob, 5, 11, side * 0.3, 0, Math.PI * 2);
+        const bob = Math.sin(phase * 2 + side) * 2.5;
+        const cx = side * 15 - 1;
+        ctx.moveTo(cx, -62);
+        ctx.quadraticCurveTo(cx + side * 9, -52 + bob, cx + side * 3, -36 + bob);
+        ctx.quadraticCurveTo(cx + side * 2, -46, cx - side * 3, -58);
+        ctx.closePath();
       }
     } else if (look.style === 'long') {
-      ctx.moveTo(-12, -58);
-      ctx.quadraticCurveTo(-18, -40, -14 + flow, -30);
-      ctx.lineTo(4, -34);
-      ctx.lineTo(10, -44);
-      ctx.lineTo(12, -58);
+      ctx.moveTo(-13, -60);
+      ctx.quadraticCurveTo(-19, -44, -15 + flow, -28);
+      ctx.lineTo(-10 + flow, -31);
+      ctx.lineTo(-6 + flow, -27);
+      ctx.lineTo(-2, -32);
+      ctx.lineTo(4, -36);
+      ctx.lineTo(12, -44);
+      ctx.lineTo(13, -60);
     } else if (look.style === 'bob') {
-      ctx.moveTo(-13, -58);
-      ctx.quadraticCurveTo(-16, -44, -10, -40);
-      ctx.lineTo(10, -40);
-      ctx.quadraticCurveTo(15, -46, 13, -58);
+      ctx.moveTo(-14, -60);
+      ctx.quadraticCurveTo(-17, -46, -12, -40);
+      ctx.lineTo(-6, -41.5);
+      ctx.lineTo(-1, -40);
+      ctx.lineTo(-4, -46);
+      ctx.lineTo(-2, -60);
     } else if (look.style === 'bun') {
-      ctx.arc(-6, -66, 6, 0, Math.PI * 2);
+      ctx.arc(-8, -68, 6.5, 0, Math.PI * 2);
     } else {
       return;
     }
     ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
+    outlineFill(look.hairDark);
   }
 
   function drawFrontHair(look) {
+    const style = look.style;
     ctx.beginPath();
-    if (look.style === 'spiky') {
-      ctx.moveTo(-13, -50);
-      const spikes = [[-16, -62], [-9, -61], [-8, -72], [-1, -64], [4, -74], [8, -64], [16, -68], [13, -56], [17, -52], [10, -55], [6, -50], [3, -56], [-2, -50], [-6, -55]];
-      for (const [px, py] of spikes) ctx.lineTo(px, py);
-    } else if (look.style === 'short') {
-      ctx.moveTo(-12, -48);
-      ctx.quadraticCurveTo(-13, -67, 2, -66);
-      ctx.quadraticCurveTo(15, -66, 14, -54);
-      ctx.lineTo(9, -57);
-      ctx.lineTo(5, -54);
-      ctx.lineTo(1, -58);
-      ctx.lineTo(-4, -56);
-      ctx.lineTo(-8, -52);
+    if (style === 'spiky') {
+      ctx.moveTo(-14, -48);
+      const pts = [[-18, -60], [-12, -62], [-15, -72], [-6, -67], [-5, -78], [1, -69], [6, -79], [9, -68], [17, -74], [14, -63], [19, -59], [14, -56],
+        [12, -51], [10, -57], [7, -51], [5, -58], [1, -52], [-2, -58], [-5, -52], [-8, -57], [-11, -50]];
+      for (const [px, py] of pts) ctx.lineTo(px, look.cap ? Math.max(py, -63) : py);
+    } else if (style === 'short' || style === 'messy') {
+      ctx.moveTo(-13, -49);
+      ctx.quadraticCurveTo(-16, -66, -2, -70.5);
+      if (style === 'messy') {
+        ctx.lineTo(1, -73);
+        ctx.lineTo(4, -70.5);
+        ctx.lineTo(9, -72);
+        ctx.lineTo(10, -68);
+      }
+      ctx.quadraticCurveTo(15.5, -67, 15, -56);
+      ctx.lineTo(13.5, -52);
+      ctx.lineTo(11, -56.5);
+      ctx.lineTo(8.5, -53);
+      ctx.lineTo(6, -57.5);
+      ctx.lineTo(2, -54.5);
+      ctx.lineTo(-1, -58);
+      ctx.lineTo(-5, -55);
+      ctx.lineTo(-8, -58);
+      ctx.lineTo(-10, -52);
     } else {
-      ctx.moveTo(-12, -48);
-      ctx.quadraticCurveTo(-12, -68, 2, -66);
-      ctx.quadraticCurveTo(16, -66, 14, -50);
-      ctx.lineTo(10, -56);
-      ctx.lineTo(7, -50);
-      ctx.lineTo(4, -57);
-      ctx.lineTo(0, -51);
-      ctx.lineTo(-4, -57);
-      ctx.lineTo(-8, -50);
+      // Longer fringe with pointed locks, framing the face
+      ctx.moveTo(-14, -44);
+      ctx.quadraticCurveTo(-17, -66, 0, -70.5);
+      ctx.quadraticCurveTo(15, -70, 16, -56);
+      ctx.quadraticCurveTo(16.5, -50, 14.5, -45);
+      ctx.lineTo(13, -52);
+      ctx.lineTo(11.5, -49.5);
+      ctx.lineTo(10, -57);
+      ctx.lineTo(7, -51.5);
+      ctx.lineTo(4.5, -58);
+      ctx.lineTo(1.5, -52.5);
+      ctx.lineTo(-1, -58.5);
+      ctx.lineTo(-4, -53);
+      ctx.lineTo(-7, -58);
+      ctx.lineTo(-9.5, -50);
+      ctx.lineTo(-10.5, -44);
     }
     ctx.closePath();
+    ctx.save();
     outlineFill(look.hair);
-    // Glossy anime highlight
-    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
-    ctx.lineWidth = 1.6;
+    ctx.clip();
+    // Darker underside and strand lines
+    ctx.fillStyle = 'rgba(0,0,0,0.16)';
+    ctx.fillRect(-20, -59, 40, 12);
+    ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+    ctx.lineWidth = 0.8;
     ctx.beginPath();
-    ctx.arc(1, -54, 9, -2.5, -1.4);
+    for (const sx2 of [-6, -1, 4, 9]) {
+      ctx.moveTo(sx2 - 2, -69);
+      ctx.quadraticCurveTo(sx2 + 1, -63, sx2, -56);
+    }
     ctx.stroke();
-    if (look.style === 'twin') {
-      ctx.fillStyle = look.pom || '#fff';
+    ctx.restore();
+    // Glossy "angel ring" highlight
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 1.6;
+    for (const [a0, a1] of [[-2.55, -2.25], [-2.05, -1.6], [-1.4, -1.0]]) {
       ctx.beginPath();
-      ctx.arc(-9, -60, 2.5, 0, Math.PI * 2);
-      ctx.arc(11, -60, 2.5, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.arc(1, -58, 10.5, a0, a1);
+      ctx.stroke();
+    }
+    if (style === 'twin' || style === 'pony') {
+      ctx.fillStyle = look.pom || look.trim || '#ff6b6b';
+      for (const [bx, by] of style === 'twin' ? [[-11, -64], [13, -64]] : [[-10, -63]]) {
+        ctx.beginPath();
+        ctx.arc(bx, by, 2.6, 0, Math.PI * 2);
+        outlineFill(look.pom || look.trim || '#ff6b6b', 0.8);
+      }
     }
   }
 
@@ -911,7 +1125,7 @@
 
     if (state === 'race' && player.finished) {
       resultsDelay -= dt;
-      if (resultsDelay <= 0) state = 'results';
+      if (resultsDelay <= 0) { state = 'results'; resultsShownAt = performance.now(); }
     }
   }
 
@@ -2079,7 +2293,7 @@
     ctx.stroke();
     if (TOUCH) {
       label(text, x + w / 2, y + 34, 22, '#ffffff', 'center', '900');
-      label(keysText, x + w / 2, y + 54, 12, 'rgba(255,255,255,0.7)');
+      label(name === 'brake' ? 'or hold left side' : 'or hold right side', x + w / 2, y + 54, 12, 'rgba(255,255,255,0.75)');
     } else {
       label(`${text}  ${keysText.split(' / ')[0]}`, x + w / 2, y + 20, 13, '#ffffff', 'center', '900');
     }
@@ -2146,12 +2360,12 @@
     if (state === 'title') {
       drawPanel('TRAM RACER', [
         { t: 'Melbourne edition: your W class vs the CPU\'s G class', c: '#ffd43b' },
-        { t: 'Hold → to run to your tram, it boards by itself' },
-        { t: 'On the tram: hold → for power, ← to brake' },
+        { t: TOUCH ? 'Hold the right side to run to your tram, it boards by itself' : 'Hold → to run to your tram, it boards by itself' },
+        { t: TOUCH ? 'On the tram: hold right side for power, left side to brake' : 'On the tram: hold → for power, ← to brake' },
         { t: 'Over 40 km/h on a curve and you derail' },
         { t: 'Red light at a crossing? Stop, or meet a car' },
         { t: '' },
-        { t: 'Press Enter, Space or tap to start', c: Math.floor(clock * 2.5) % 2 ? '#69db7c' : '#2f9e44', size: 20, w: '900' },
+        { t: TOUCH ? 'Tap to start' : 'Press Enter, Space or tap to start', c: Math.floor(clock * 2.5) % 2 ? '#69db7c' : '#2f9e44', size: 20, w: '900' },
       ], '#ffffff');
       drawChar(W / 2 - 330, 360, PLAYER_LOOK, { scale: 2.4 });
       drawChar(W / 2 + 330, 360, CPU_LOOK, { scale: 2.4 });
@@ -2168,7 +2382,7 @@
         { t: `You (W class)   ${fmtTime(player.finishTime)}`, c: '#b2f2bb' },
         { t: `CPU (G class)   ${cpu.finished ? fmtTime(cpu.finishTime) : 'still going...'}`, c: '#dee2e6' },
         { t: '' },
-        { t: 'Press Enter, Space or tap to race again', c: Math.floor(clock * 2.5) % 2 ? '#69db7c' : '#2f9e44', size: 20, w: '900' },
+        { t: TOUCH ? 'Tap to race again' : 'Press Enter, Space or tap to race again', c: Math.floor(clock * 2.5) % 2 ? '#69db7c' : '#2f9e44', size: 20, w: '900' },
       ], won ? '#ffd43b' : '#ff6b6b');
     }
   }
@@ -2188,42 +2402,55 @@
     touch.power = touch.brake = false;
   });
 
-  // Pointer input: on-screen pedals, or tap anywhere to start.
+  // Pointer input (built for iPhone and iPad): tapping or holding anywhere on
+  // the right half of the screen works like →, the left half like ←. The
+  // on-screen pedals sit in those halves too. Tap anywhere to start.
   const pointers = new Map();
-  function toCanvas(e) {
-    const rect = canvas.getBoundingClientRect();
-    return [(e.clientX - rect.left) * (W / rect.width), (e.clientY - rect.top) * (H / rect.height)];
-  }
-  function pedalAt(x, y) {
-    for (const [name, [px, py, pw, ph]] of Object.entries(PEDALS)) {
-      if (x >= px && x <= px + pw && y >= py && y <= py + ph) return name;
-    }
-    // Otherwise, the left half brakes and the right half powers.
-    return x < W / 2 ? 'brake' : 'power';
+  let resultsShownAt = 0;
+  function sideOf(e) {
+    return e.clientX < window.innerWidth / 2 ? 'brake' : 'power';
   }
   function syncTouch() {
     const held = [...pointers.values()];
     touch.power = held.includes('power');
     touch.brake = held.includes('brake');
   }
-  canvas.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
+  const isUi = (e) => e.target && e.target.closest && e.target.closest('a, button');
+  window.addEventListener('pointerdown', (e) => {
+    if (isUi(e)) return;
+    if (e.cancelable) e.preventDefault();
     initAudio();
-    if (state === 'title' || state === 'results') {
+    if (state === 'title' || (state === 'results' && performance.now() - resultsShownAt > 900)) {
       startCountdown();
       return;
     }
-    canvas.setPointerCapture(e.pointerId);
-    const [x, y] = toCanvas(e);
-    pointers.set(e.pointerId, pedalAt(x, y));
+    if (state === 'results') return;
+    pointers.set(e.pointerId, sideOf(e));
+    syncTouch();
+  }, { passive: false });
+  // Sliding a finger across the middle switches pedals.
+  window.addEventListener('pointermove', (e) => {
+    if (!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, sideOf(e));
     syncTouch();
   });
-  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) {
-    canvas.addEventListener(ev, (e) => {
+  for (const ev of ['pointerup', 'pointercancel']) {
+    window.addEventListener(ev, (e) => {
       pointers.delete(e.pointerId);
       syncTouch();
     });
   }
+  window.addEventListener('blur', () => {
+    pointers.clear();
+    syncTouch();
+  });
+  // Stop iOS Safari from scrolling, zooming, selecting or popping up the
+  // magnifier while you hold the screen.
+  for (const ev of ['touchstart', 'touchmove', 'gesturestart', 'dblclick']) {
+    document.addEventListener(ev, (e) => { if (!isUi(e) && e.cancelable) e.preventDefault(); }, { passive: false });
+  }
+  // iOS only unlocks audio from touchend / click.
+  document.addEventListener('touchend', () => initAudio(), { passive: true });
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
   // ---- Main loop ----------------------------------------------------------
