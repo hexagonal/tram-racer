@@ -21,7 +21,7 @@
   const DRAG = 0.6;
   const SLOW_LIMIT = 11.2;       // 40 km/h
   const SLOW_TOLERANCE = 1.4;
-  const SLOW_LEN = 60;
+  const SLOW_LEN = [30, 110];    // curve length range, metres
   const STUN_CRASH = 2;
   const STUN_DERAIL = 3;
   const CROSS_HALF = 3;          // half the width of a road crossing, metres
@@ -143,19 +143,22 @@
     const rnd = mulberry32(seed);
     const slowZones = [];
     const crossings = [];
-    let x = 190;
+    // Every race gets a fresh layout: where the curves and crossings are,
+    // how many there are and how long each curve is all change.
+    let x = 150 + rnd() * 110;
     let last = null;
     while (x < TRACK_LEN - 120) {
       let type = rnd() < 0.5 ? 'slow' : 'cross';
       if (type === last && rnd() < 0.6) type = type === 'slow' ? 'cross' : 'slow';
       if (type === 'slow') {
-        slowZones.push({ start: x, end: x + SLOW_LEN, limit: SLOW_LIMIT });
-        x += SLOW_LEN;
+        const len = SLOW_LEN[0] + rnd() * (SLOW_LEN[1] - SLOW_LEN[0]);
+        slowZones.push({ start: x, end: x + len, limit: SLOW_LIMIT });
+        x += len;
       } else {
         crossings.push({ x, period: 6 + rnd() * 3, phase: rnd() * 9, color: pick(CAR_COLORS, rnd), hitCycle: -1 });
       }
       last = type;
-      x += 140 + rnd() * 110;
+      x += 110 + rnd() * 160;
     }
 
     // Cheerleaders turn up now and then along the footpaths. Spectators (three
