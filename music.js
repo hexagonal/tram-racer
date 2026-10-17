@@ -58,11 +58,11 @@
   let ac = null, out = null, buffers = null, current = null, muted = false, lastBell = -Infinity;
 
   // Built once per audio context and shared by every race's music.
-  function setup(ctx) {
+  function setup(ctx, dest) {
     ac = ctx;
     out = ac.createGain();
     out.gain.value = muted || document.hidden ? 0 : 1;
-    out.connect(ac.destination);
+    out.connect(dest || ac.destination);
     const white = (seconds) => {
       const len = Math.floor(ac.sampleRate * seconds), buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
@@ -438,9 +438,10 @@
 
   window.TramMusic = {
     // Start fresh music for a new race, fading out the last race's.
-    start(ctx) {
+    // `dest` is the game's master volume node.
+    start(ctx, dest) {
       if (!ctx) return;
-      if (ctx !== ac) setup(ctx);
+      if (ctx !== ac) setup(ctx, dest);
       if (current) current.stop();
       current = session();
     },

@@ -13,8 +13,8 @@ A silly tram race through Melbourne that runs in a web browser. You (in a green-
 4. Watch out for:
    - **Curves** (yellow chevrons, "40" signs): go over 40 km/h and you derail.
    - **Road crossings**: when the light by your track is red, a car is about to cross. Stop, or hit it.
-5. Each race has its own soundtrack: upbeat lofi made live in the browser, in a random key and tempo with new variations every bar, so no two races sound the same. The tram bell rings at most once a minute. Press **M** to turn the music off or on.
-6. Cheerleaders and a mix of male and female spectators, spread out along the route, cheer you on, and TV news crews cover the start and the finish. First tram past the finish wins.
+5. Each race has its own soundtrack: upbeat lofi made live in the browser, in a random key and tempo with new variations every bar, so no two races sound the same. The tram bell rings at most once a minute. Press **M** to turn the music off or on. The speaker button in the top-right corner opens a volume slider for all the game's sound (music and effects); drag it with a finger or the mouse, and the game remembers it.
+6. Cheerleaders and a mix of male and female spectators, spread out along the route, cheer you on (one of them thinks this game is silly), and TV news crews cover the start and the finish. First tram past the finish wins.
 
 ## Running it
 
