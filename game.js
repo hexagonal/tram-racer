@@ -239,7 +239,11 @@
     const stops = [];
     for (let sx = 260; sx < TRACK_LEN - 100; sx += 330 + rnd() * 120) stops.push({ x: sx, n: 10 + Math.floor(rnd() * 120) });
 
-    return { slowZones, crossings, people, vans, far, mid, trees, stops };
+    // About one race in three, a burger blimp drifts over somewhere in the
+    // middle of the course (never near the start or finish).
+    const blimp = rnd() < 1 / 3 ? { x: TRACK_LEN * (0.25 + rnd() * 0.5), y: 62 + rnd() * 40 } : null;
+
+    return { slowZones, crossings, people, vans, far, mid, trees, stops, blimp };
   }
 
   // Where the car at a crossing is (y of its wheels, in pixels) at a time, or null.
@@ -1292,6 +1296,92 @@
       ctx.ellipse(cx - 28, cy - 4, 26, 11, 0, 0, Math.PI * 2);
       ctx.fill();
     }
+  }
+
+  // Red BURGERS blimp, at half parallax so it hangs in the sky a while.
+  function drawBlimp() {
+    const b = course.blimp;
+    if (!b) return;
+    const x = (b.x - camX) * PX * 0.5 + 240 + clock * 5;
+    if (x < -200 || x > W + 200) return;
+    const y = b.y + Math.sin(clock * 0.8) * 3;
+    const L = 170, R = 34;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(Math.sin(clock * 0.6) * 0.015);
+    // Shadow-ish haze underneath
+    ctx.fillStyle = 'rgba(0,0,0,0.06)';
+    ctx.beginPath();
+    ctx.ellipse(4, R + 18, L * 0.4, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Tail fins
+    ctx.fillStyle = '#9e1b1b';
+    ctx.strokeStyle = '#5c0e0e';
+    ctx.lineWidth = 1.5;
+    for (const dir of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(-L * 0.36, dir * R * 0.3);
+      ctx.lineTo(-L * 0.52, dir * R * 1.1);
+      ctx.lineTo(-L * 0.6, dir * R * 1.05);
+      ctx.lineTo(-L * 0.52, dir * R * 0.15);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+    // Gondola
+    ctx.fillStyle = '#e9e4da';
+    ctx.beginPath();
+    ctx.moveTo(-18, R - 2);
+    ctx.lineTo(22, R - 2);
+    ctx.quadraticCurveTo(24, R + 11, 14, R + 12);
+    ctx.lineTo(-14, R + 12);
+    ctx.quadraticCurveTo(-20, R + 11, -18, R - 2);
+    ctx.fill();
+    ctx.strokeStyle = '#7a7466';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.fillStyle = '#3b4c63';
+    for (let i = 0; i < 5; i++) ctx.fillRect(-13 + i * 7, R + 2, 5, 5);
+    // Envelope
+    const g = ctx.createLinearGradient(0, -R, 0, R);
+    g.addColorStop(0, '#ff5a4a');
+    g.addColorStop(0.45, '#d92525');
+    g.addColorStop(1, '#8f1212');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, L / 2, R, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#5c0e0e';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // Panel seams and a shine
+    ctx.strokeStyle = 'rgba(90,10,10,0.35)';
+    ctx.lineWidth = 1;
+    for (const k of [-0.55, 0.55]) {
+      ctx.beginPath();
+      ctx.ellipse(0, 0, L / 2, R * Math.abs(k), 0, k < 0 ? Math.PI : 0, k < 0 ? Math.PI * 2 : Math.PI);
+      ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.28)';
+    ctx.beginPath();
+    ctx.ellipse(8, -R * 0.55, L * 0.32, R * 0.18, -0.03, 0, Math.PI * 2);
+    ctx.fill();
+    // Nose cap
+    ctx.fillStyle = '#f4c430';
+    ctx.beginPath();
+    ctx.ellipse(L / 2 - 4, 0, 5, R * 0.42, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // BURGERS
+    ctx.font = `900 30px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = '#7a1010';
+    ctx.strokeText('BURGERS', -4, 2);
+    ctx.fillStyle = '#ffd43b';
+    ctx.fillText('BURGERS', -4, 2);
+    ctx.restore();
   }
 
   function drawFar() {
@@ -2457,6 +2547,7 @@
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     drawSky();
     drawFar();
+    drawBlimp();
     drawMid();
     drawTrees();
     drawStreet();
