@@ -242,14 +242,24 @@
     // Shoes
     ctx.fillStyle = look.style === 'twin' ? '#ffffff' : '#222';
 
-    // Back arm
-    const armSwing = a.armsUp ? Math.PI - 0.4 + Math.sin(phase * 2) * 0.25 : (moving ? -Math.sin(phase) * 1.1 : 0.15);
-    const backHand = limb(-2, -36, 13, -armSwing, 4, look.skin);
-    if (look.pom) {
-      ctx.fillStyle = look.pom;
-      ctx.beginPath();
-      ctx.arc(backHand[0], backHand[1], 5, 0, Math.PI * 2);
-      ctx.fill();
+    // Arms. When cheering they go up and out in a wide V, drawn behind the
+    // head so they never cover the face.
+    const arm = (shoulderX, ang, len, pomR) => {
+      const hand = limb(shoulderX, -36, len, ang, 4, look.skin);
+      if (look.pom) {
+        ctx.fillStyle = look.pom;
+        ctx.beginPath();
+        ctx.arc(hand[0], hand[1], pomR, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    };
+    const wave = Math.sin(phase * 2) * 0.15;
+    const armSwing = moving ? -Math.sin(phase) * 1.1 : 0.15;
+    if (a.armsUp) {
+      arm(-2, -(Math.PI - 1.2) - wave, 15, 5.5);
+      arm(3, Math.PI - 1.2 + wave, 15, 5.5);
+    } else {
+      arm(-2, -armSwing, 13, 5);
     }
 
     // Body
@@ -372,18 +382,14 @@
     ctx.stroke();
 
     // Front arm
-    const frontHand = limb(3, -36, 13, armSwing, 4, look.skin);
-    ctx.strokeStyle = look.outfit;
-    ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.moveTo(3, -36);
-    ctx.lineTo(3 + Math.sin(armSwing) * 5, -36 + Math.cos(armSwing) * 5);
-    ctx.stroke();
-    if (look.pom) {
-      ctx.fillStyle = look.pom;
+    if (!a.armsUp) {
+      arm(3, armSwing, 13, 5.5);
+      ctx.strokeStyle = look.outfit;
+      ctx.lineWidth = 5;
       ctx.beginPath();
-      ctx.arc(frontHand[0], frontHand[1], 5.5, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.moveTo(3, -36);
+      ctx.lineTo(3 + Math.sin(armSwing) * 5, -36 + Math.cos(armSwing) * 5);
+      ctx.stroke();
     }
     ctx.restore();
   }
