@@ -1,18 +1,19 @@
 # Tram Racer
 
-A silly 8-bit tram race that runs in a web browser. You and a CPU driver start on the pavement, sprint to your trams, jump in, and race down two parallel tracks to the end of the line.
+A silly tram race through Melbourne that runs in a web browser. You (in a green-and-cream **W class**) race the CPU (in a modern **G class**) down two parallel tracks. First you both have to run to your trams.
 
 ## How to play
 
-1. Press **Enter** (or click the game) to start.
-2. After the countdown, **run to your tram** by tapping **←** and **→** one after the other, as fast as you can.
-3. Once you're aboard, the tram can only go forwards on its track:
-   - **→** (or **D**) powers the tram.
-   - **←** (or **A**) brakes.
+1. Press **Enter**, **Space**, or tap the game to start.
+2. After the countdown, **hold → (or D) to run** to your tram. You jump aboard when you reach the door.
+3. On the tram you can only go forwards:
+   - **→ / D** (or ↑ / W) powers the tram.
+   - **← / A** (or ↓ / S) brakes.
+   - On a touch screen, or with the mouse, hold the **POWER** and **BRAKE** pedals in the corners.
 4. Watch out for:
-   - **Slow zones** (yellow and black strip, "40" sign): go over 40 km/h in one and you derail.
+   - **Curves** (yellow chevrons, "40" signs): go over 40 km/h and you derail.
    - **Road crossings**: when the light by your track is red, a car is about to cross. Stop, or hit it.
-5. First tram past the chequered flag wins. Press **Enter** to race again.
+5. Cheerleaders on the footpath cheer you on along the way. First tram past the finish wins.
 
 ## Running it
 
@@ -28,4 +29,4 @@ All paths are relative, so it also works from GitHub Pages under a subpath.
 ## Files
 
 - `index.html`: the page and canvas.
-- `game.js`: the whole game (plain JavaScript, HTML5 canvas, Web Audio for the bleeps).
+- `game.js`: the whole game (plain JavaScript, HTML5 canvas, Web Audio for sound).
