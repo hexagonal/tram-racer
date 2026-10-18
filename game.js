@@ -239,11 +239,12 @@
     const stops = [];
     for (let sx = 260; sx < TRACK_LEN - 100; sx += 330 + rnd() * 120) stops.push({ x: sx, n: 10 + Math.floor(rnd() * 120) });
 
-    // About one race in three, a burger blimp drifts over somewhere in the
-    // middle of the course (never near the start or finish).
-    const blimp = rnd() < 1 / 3 ? { x: TRACK_LEN * (0.25 + rnd() * 0.5), y: 62 + rnd() * 40 } : null;
+    // Every race, one surprise turns up in the sky somewhere in the middle of
+    // the course (never near the start or finish): the BURGERS blimp, a TV
+    // news helicopter or a distant 747.
+    const sky = { kind: pick(['blimp', 'copter', 'jet'], rnd), x: TRACK_LEN * (0.25 + rnd() * 0.5), y: rnd() };
 
-    return { slowZones, crossings, people, vans, far, mid, trees, stops, blimp };
+    return { slowZones, crossings, people, vans, far, mid, trees, stops, sky };
   }
 
   // Where the car at a crossing is (y of its wheels, in pixels) at a time, or null.
@@ -1298,13 +1299,18 @@
     }
   }
 
+  function drawSkyThing() {
+    const k = course.sky;
+    if (k.kind === 'blimp') drawBlimp(k);
+    else if (k.kind === 'copter') drawCopter(k);
+    else drawJet(k);
+  }
+
   // Red BURGERS blimp, at half parallax so it hangs in the sky a while.
-  function drawBlimp() {
-    const b = course.blimp;
-    if (!b) return;
-    const x = (b.x - camX) * PX * 0.5 + 240 + clock * 5;
+  function drawBlimp(b) {
+    const x = (b.x - camX) * PX * 0.5 + 240 + raceTime * 5;
     if (x < -200 || x > W + 200) return;
-    const y = b.y + Math.sin(clock * 0.8) * 3;
+    const y = 62 + b.y * 40 + Math.sin(clock * 0.8) * 3;
     const L = 170, R = 34;
     ctx.save();
     ctx.translate(x, y);
@@ -1381,6 +1387,207 @@
     ctx.strokeText('BURGERS', -4, 2);
     ctx.fillStyle = '#ffd43b';
     ctx.fillText('BURGERS', -4, 2);
+    ctx.restore();
+  }
+
+  // TV news helicopter hovering over the race, nose down, camera pointed at
+  // the street. Nearer than the blimp, so it passes a bit quicker.
+  function drawCopter(c) {
+    const x = (c.x - camX) * PX * 0.6 + 380 + Math.sin(clock * 0.5) * 30;
+    if (x < -150 || x > W + 150) return;
+    const y = 58 + c.y * 36 + Math.sin(clock * 1.3) * 4;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(0.06 + Math.sin(clock * 0.9) * 0.03);
+    ctx.lineJoin = 'round';
+    // Tail boom and fin
+    ctx.fillStyle = '#e9ecef';
+    ctx.strokeStyle = '#343a40';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-14, -6);
+    ctx.lineTo(-62, -5);
+    ctx.lineTo(-62, 0);
+    ctx.lineTo(-14, 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#1864ab';
+    ctx.beginPath();
+    ctx.moveTo(-56, -5);
+    ctx.lineTo(-66, -19);
+    ctx.lineTo(-70, -19);
+    ctx.lineTo(-66, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // Tail rotor (a blurred disc)
+    ctx.fillStyle = 'rgba(60,60,70,0.35)';
+    ctx.beginPath();
+    ctx.ellipse(-66, -8, 2.5, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Skids
+    ctx.strokeStyle = '#343a40';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-12, 15);
+    ctx.lineTo(-10, 22);
+    ctx.moveTo(10, 15);
+    ctx.lineTo(8, 22);
+    ctx.moveTo(-22, 22);
+    ctx.lineTo(20, 22);
+    ctx.quadraticCurveTo(26, 22, 27, 18);
+    ctx.stroke();
+    // Body
+    const g = ctx.createLinearGradient(0, -18, 0, 18);
+    g.addColorStop(0, '#ffffff');
+    g.addColorStop(1, '#ced4da');
+    ctx.fillStyle = g;
+    ctx.strokeStyle = '#343a40';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-20, -8);
+    ctx.quadraticCurveTo(-16, -18, 4, -18);
+    ctx.quadraticCurveTo(26, -17, 30, 2);
+    ctx.quadraticCurveTo(30, 15, 14, 16);
+    ctx.lineTo(-16, 16);
+    ctx.quadraticCurveTo(-24, 14, -20, -8);
+    ctx.fill();
+    ctx.stroke();
+    // Stripe and lettering
+    ctx.fillStyle = '#d6336c';
+    ctx.fillRect(-19, 6, 44, 3);
+    ctx.font = `900 9px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#1864ab';
+    ctx.fillText('TN7 NEWS', -3, 1);
+    // Cockpit glass
+    ctx.fillStyle = '#5c8fbf';
+    ctx.beginPath();
+    ctx.moveTo(10, -15);
+    ctx.quadraticCurveTo(24, -14, 28, -1);
+    ctx.lineTo(12, -1);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.fillRect(14, -12, 3, 8);
+    // Camera ball under the nose
+    ctx.fillStyle = '#212529';
+    ctx.beginPath();
+    ctx.arc(22, 17, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#74c0fc';
+    ctx.beginPath();
+    ctx.arc(24, 18, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+    // Mast and main rotor: a blurred disc plus one sharp blade
+    ctx.fillStyle = '#495057';
+    ctx.fillRect(-2, -24, 4, 7);
+    ctx.fillStyle = 'rgba(60,60,70,0.22)';
+    ctx.beginPath();
+    ctx.ellipse(0, -24, 58, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    const blade = Math.cos(clock * 40) * 58;
+    ctx.strokeStyle = 'rgba(40,40,50,0.7)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-blade, -24);
+    ctx.lineTo(blade, -24);
+    ctx.stroke();
+    // Blinking beacon
+    if (Math.floor(clock * 2) % 2) {
+      ctx.fillStyle = '#ff3b30';
+      ctx.beginPath();
+      ctx.arc(-67, -19, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // A 747 high and far away, flying the other way with contrails.
+  function drawJet(j) {
+    const x = (j.x - camX) * PX * 0.35 + 560 - raceTime * 4;
+    if (x < -260 || x > W + 120) return;
+    const y = 104 + j.y * 22;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(1.35, 1.35);
+    ctx.globalAlpha = 0.9;
+    // Contrails stream out behind (to the right; it flies left)
+    for (const dy of [-1.5, 2.5]) {
+      const cg = ctx.createLinearGradient(30, 0, 230, 0);
+      cg.addColorStop(0, 'rgba(255,255,255,0.85)');
+      cg.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.strokeStyle = cg;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(8, 3 + dy);
+      ctx.lineTo(230, 2 + dy * 3);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = '#6c757d';
+    ctx.lineWidth = 0.8;
+    ctx.lineJoin = 'round';
+    // Far wing
+    ctx.fillStyle = '#b8c0c8';
+    ctx.beginPath();
+    ctx.moveTo(-2, 0);
+    ctx.lineTo(16, -9);
+    ctx.lineTo(20, -9);
+    ctx.lineTo(10, 0);
+    ctx.closePath();
+    ctx.fill();
+    // Fuselage, with the 747's hump at the front
+    ctx.fillStyle = '#f1f3f5';
+    ctx.beginPath();
+    ctx.moveTo(-34, 2);
+    ctx.quadraticCurveTo(-34, -2, -28, -3);
+    ctx.quadraticCurveTo(-24, -7, -14, -6.5);
+    ctx.quadraticCurveTo(-10, -3, -4, -3);
+    ctx.lineTo(28, -3);
+    ctx.lineTo(36, -5);
+    ctx.lineTo(36, 0);
+    ctx.lineTo(30, 3);
+    ctx.lineTo(-28, 4.5);
+    ctx.quadraticCurveTo(-34, 4.5, -34, 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // Cheatline and windows
+    ctx.fillStyle = '#1c4e9c';
+    ctx.fillRect(-30, 0.6, 58, 1.2);
+    ctx.fillStyle = '#495057';
+    for (let wx = -26; wx < 26; wx += 2.6) ctx.fillRect(wx, -1.4, 1.1, 1);
+    ctx.fillRect(-22, -5, 1, 1);
+    ctx.fillRect(-19.5, -5, 1, 1);
+    // Tail fin
+    ctx.fillStyle = '#c92a2a';
+    ctx.beginPath();
+    ctx.moveTo(26, -3);
+    ctx.lineTo(34, -16);
+    ctx.lineTo(38, -16);
+    ctx.lineTo(36, -3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // Near wing with four engines
+    ctx.fillStyle = '#ced4da';
+    ctx.beginPath();
+    ctx.moveTo(-6, 2);
+    ctx.lineTo(16, 13);
+    ctx.lineTo(21, 13);
+    ctx.lineTo(10, 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#868e96';
+    for (const [ex, ey] of [[2, 6], [10, 10], [5, -3.5], [12, -7]]) {
+      ctx.beginPath();
+      ctx.ellipse(ex, ey, 2.6, 1.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
   }
 
@@ -2547,7 +2754,7 @@
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     drawSky();
     drawFar();
-    drawBlimp();
+    drawSkyThing();
     drawMid();
     drawTrees();
     drawStreet();
